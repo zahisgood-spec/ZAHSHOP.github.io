@@ -1,0 +1,2817 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>展商城 // IMMERSIVE v6</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #05050f;
+    --bg-rgb: 5,5,15;
+    --text: #ffffff;
+    --text-dim: rgba(255,255,255,0.5);
+    --text-faint: rgba(255,255,255,0.3);
+    --accent: #8ab4ff;
+    --accent2: #c78aff;
+    --card-bg: rgba(10,10,25,0.4);
+    --card-border: rgba(138,180,255,0.2);
+    --hud: rgba(138,180,255,0.6);
+  }
+  [data-theme="light"] {
+    --bg: #f0f2f8;
+    --bg-rgb: 240,242,248;
+    --text: #0a0a1a;
+    --text-dim: rgba(10,10,26,0.6);
+    --text-faint: rgba(10,10,26,0.4);
+    --accent: #3060d0;
+    --accent2: #8040c0;
+    --card-bg: rgba(255,255,255,0.5);
+    --card-border: rgba(48,96,208,0.25);
+    --hud: rgba(48,96,208,0.7);
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', 'Noto Sans TC', monospace;
+    overflow: hidden;
+    cursor: none;
+    height: 100vh;
+    perspective: 1500px;
+    transition: background 0.8s, color 0.8s;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  canvas { display: block; }
+
+  /* ============================================================
+     V20：背景影片
+     ============================================================ */
+  #bg-video {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    object-fit: cover;
+    z-index: 0;
+    opacity: 0.25;
+    filter: blur(2px) saturate(1.2);
+    transition: opacity 0.8s;
+    pointer-events: none;
+  }
+  [data-theme="light"] #bg-video {
+    opacity: 0.15;
+    filter: blur(3px) saturate(0.8) brightness(1.2);
+  }
+
+  #three-canvas {
+    position: fixed; top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    z-index: 1;
+    transition: filter 0.6s;
+    touch-action: none;
+  }
+  #p5-canvas {
+    position: fixed; top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .cursor {
+    position: fixed;
+    width: 24px; height: 24px;
+    border: 1.5px solid var(--text);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: width 0.2s, height 0.2s, background 0.2s, border-color 0.6s;
+    mix-blend-mode: difference;
+  }
+  .cursor-dot {
+    position: fixed;
+    width: 5px; height: 5px;
+    background: var(--text);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: background 0.6s;
+  }
+  .cursor.active {
+    width: 60px; height: 60px;
+    background: rgba(255,255,255,0.15);
+  }
+
+  .hud {
+    position: fixed;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--hud);
+    z-index: 10;
+    pointer-events: none;
+    text-transform: uppercase;
+    transition: color 0.6s;
+  }
+  .hud-tl { top: 24px; left: 24px; }
+  .hud-tr { top: 24px; right: 24px; text-align: right; }
+  .hud-bl { bottom: 24px; left: 24px; }
+  .hud-br { bottom: 24px; right: 24px; text-align: right; }
+  .hud .blink { animation: blink 1s infinite; }
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+  }
+  .hud .clock-time {
+    font-size: 13px;
+    letter-spacing: 3px;
+    color: var(--text);
+  }
+
+  #audio-viz {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 240px;
+    height: 40px;
+    z-index: 8;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 3px;
+    opacity: 0;
+    transition: opacity 0.6s;
+    pointer-events: none;
+  }
+  #audio-viz.visible { opacity: 0.8; }
+  #audio-viz .bar {
+    width: 4px;
+    height: 2px;
+    background: linear-gradient(to top, var(--accent), var(--accent2));
+    border-radius: 2px;
+    transition: height 0.06s ease;
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  .title-bar {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+    text-align: center;
+    pointer-events: none;
+    transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .title-bar h1 {
+    font-size: clamp(2rem, 6vw, 4.5rem);
+    font-weight: 200;
+    letter-spacing: 0.3em;
+    background: linear-gradient(120deg, var(--text), var(--accent), var(--accent2), var(--text));
+    background-size: 300% 300%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: flow 8s ease infinite;
+  }
+  @keyframes flow {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  .title-bar .sub {
+    margin-top: 16px;
+    font-size: 11px;
+    letter-spacing: 6px;
+    color: var(--text-faint);
+    transition: color 0.6s;
+  }
+  .title-bar .cursor-blink {
+    display: inline-block;
+    width: 8px;
+    height: 14px;
+    background: var(--accent);
+    vertical-align: middle;
+    margin-left: 4px;
+    animation: blink 0.8s infinite;
+  }
+
+  .nav-grid {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    z-index: 4;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+    width: min(90vw, 760px);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    perspective: 1500px;
+  }
+  .nav-grid.visible {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    pointer-events: auto;
+  }
+
+  .card-wrap {
+    position: relative;
+    width: 100%;
+    height: 300px;
+    transform-style: preserve-3d;
+    transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+  }
+  .card-wrap.flipped {
+    transform: rotateY(180deg);
+  }
+
+  /* V26：光線追蹤模擬（用多層光暈 + 反射） */
+  .nav-card {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    padding: 32px 28px;
+    border-radius: 16px;
+    cursor: none;
+    transition: border-color 0.4s, box-shadow 0.4s, background 0.6s;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: var(--card-bg);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border: 1px solid var(--card-border);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.1),
+      inset 0 -1px 0 rgba(138,180,255,0.1),
+      0 20px 60px rgba(0,0,0,0.3);
+  }
+  /* 反射層 */
+  .nav-card .reflect-layer {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    border-radius: 16px;
+    background: linear-gradient(
+      135deg,
+      rgba(255,255,255,0.15) 0%,
+      transparent 30%,
+      transparent 70%,
+      rgba(138,180,255,0.1) 100%
+    );
+    pointer-events: none;
+    z-index: 3;
+    opacity: 0.6;
+  }
+  /* 光線追蹤高光（跟隨滑鼠） */
+  .nav-card .highlight {
+    position: absolute;
+    width: 300px; height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 4;
+    opacity: 0;
+    transition: opacity 0.3s;
+    transform: translate(-50%, -50%);
+    mix-blend-mode: overlay;
+  }
+  .card-wrap:hover .nav-card .highlight {
+    opacity: 1;
+  }
+
+  .nav-card::after {
+    content: '';
+    position: absolute;
+    top: -2px; left: -2px;
+    right: -2px; bottom: -2px;
+    border-radius: 18px;
+    background: conic-gradient(
+      from var(--angle, 0deg),
+      transparent 0%,
+      var(--accent) 10%,
+      var(--accent2) 20%,
+      transparent 30%,
+      transparent 70%,
+      var(--accent) 80%,
+      #fff 90%,
+      transparent 100%
+    );
+    z-index: -1;
+    animation: liquidRotate 4s linear infinite;
+    opacity: 0.4;
+  }
+  @property --angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+  }
+  @keyframes liquidRotate {
+    to { --angle: 360deg; }
+  }
+
+  .nav-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(138,180,255,0.2), transparent 60%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .card-wrap:hover .nav-card::before { opacity: 1; }
+  .card-wrap:hover .nav-card {
+    border-color: var(--accent);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.2),
+      inset 0 -1px 0 var(--accent),
+      0 30px 80px rgba(138,180,255,0.2),
+      0 0 60px rgba(138,180,255,0.15);
+  }
+
+  .card-front { transform: rotateY(0deg); }
+  .card-back {
+    transform: rotateY(180deg);
+    align-items: center;
+    text-align: center;
+    justify-content: center;
+  }
+  .card-back .back-icon {
+    font-size: 48px;
+    margin-bottom: 20px;
+    color: var(--accent);
+    text-shadow: 0 0 40px var(--accent);
+    animation: iconPulse 1.5s ease infinite;
+  }
+  @keyframes iconPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.15); opacity: 0.8; }
+  }
+  .card-back .back-label {
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--accent);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+  .card-back .back-title {
+    font-size: 1.2rem;
+    font-weight: 300;
+    letter-spacing: 0.2em;
+    color: var(--text);
+    margin-bottom: 16px;
+  }
+  .card-back .back-hint {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--text-faint);
+  }
+
+  .nav-card .card-num {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    margin-bottom: 18px;
+    position: relative;
+    z-index: 2;
+  }
+  .nav-card .card-title {
+    font-size: clamp(1.1rem, 2.2vw, 1.5rem);
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    margin-bottom: 12px;
+    color: var(--text);
+    position: relative;
+    z-index: 2;
+  }
+  .nav-card .card-desc {
+    font-size: 11px;
+    letter-spacing: 1px;
+    line-height: 1.8;
+    color: var(--text-dim);
+    position: relative;
+    z-index: 2;
+  }
+  .nav-card .card-url {
+    margin-top: 16px;
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--accent);
+    opacity: 0.6;
+    word-break: break-all;
+    position: relative;
+    z-index: 2;
+  }
+  .nav-card .card-arrow {
+    position: absolute;
+    bottom: 24px;
+    right: 28px;
+    font-size: 18px;
+    color: var(--accent);
+    opacity: 0.6;
+    transition: transform 0.4s, opacity 0.4s;
+    z-index: 2;
+  }
+  .card-wrap:hover .card-arrow {
+    transform: translateX(8px);
+    opacity: 1;
+  }
+
+  /* AI 推薦高亮 */
+  .card-wrap.recommended .nav-card {
+    border-color: #ffd700;
+    box-shadow:
+      0 0 40px rgba(255,215,0,0.5),
+      0 0 80px rgba(255,215,0,0.3),
+      inset 0 0 30px rgba(255,215,0,0.1);
+  }
+  .card-wrap.recommended::before {
+    content: '✦ AI 推薦';
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 14px;
+    background: linear-gradient(90deg, #ffd700, #ffaa00);
+    color: #000;
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    border-radius: 100px;
+    z-index: 10;
+    box-shadow: 0 0 20px rgba(255,215,0,0.8);
+    animation: recBadge 1.5s ease infinite;
+  }
+  @keyframes recBadge {
+    0%, 100% { transform: translateX(-50%) scale(1); }
+    50% { transform: translateX(-50%) scale(1.08); }
+  }
+
+  #ai-toggle {
+    position: fixed;
+    bottom: 24px; right: 192px;
+    z-index: 100;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    color: var(--text);
+    font-size: 18px;
+    cursor: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+  }
+  #ai-toggle:hover {
+    border-color: var(--accent);
+    background: rgba(138,180,255,0.1);
+    box-shadow: 0 0 30px rgba(138,180,255,0.3);
+  }
+  #ai-toggle.active {
+    border-color: var(--accent2);
+    background: rgba(199,138,255,0.15);
+  }
+  #ai-toggle.speaking {
+    animation: aiSpeak 0.8s ease infinite;
+  }
+  @keyframes aiSpeak {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(138,180,255,0.6); }
+    50% { box-shadow: 0 0 0 15px rgba(138,180,255,0); }
+  }
+
+  #ai-panel {
+    position: fixed;
+    bottom: 80px;
+    right: 24px;
+    width: 340px;
+    max-height: 500px;
+    z-index: 999;
+    background: var(--card-bg);
+    backdrop-filter: blur(30px) saturate(180%);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(20px) scale(0.95);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 60px rgba(138,180,255,0.15);
+  }
+  #ai-panel.active {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+  }
+  #ai-panel .ai-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--card-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  #ai-panel .ai-header .ai-title {
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  #ai-panel .ai-header .ai-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  #ai-panel .ai-header .ai-status {
+    font-size: 9px;
+    color: var(--text-faint);
+    letter-spacing: 1px;
+  }
+  #ai-panel .ai-header .ai-status .dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: #4ade80;
+    border-radius: 50%;
+    margin-right: 4px;
+    box-shadow: 0 0 8px #4ade80;
+    animation: blink 1.5s infinite;
+  }
+  #voice-toggle {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--card-border);
+    background: transparent;
+    color: var(--text-faint);
+    font-size: 12px;
+    cursor: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+  }
+  #voice-toggle:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  #voice-toggle.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(138,180,255,0.15);
+    box-shadow: 0 0 15px rgba(138,180,255,0.4);
+  }
+  #ai-panel .ai-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 200px;
+    max-height: 320px;
+  }
+  #ai-panel .ai-messages::-webkit-scrollbar {
+    width: 4px;
+  }
+  #ai-panel .ai-messages::-webkit-scrollbar-thumb {
+    background: var(--card-border);
+    border-radius: 2px;
+  }
+  .ai-msg {
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 12px;
+    line-height: 1.6;
+    max-width: 85%;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    animation: msgIn 0.3s ease;
+    position: relative;
+  }
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .ai-msg.bot {
+    background: rgba(138,180,255,0.12);
+    border: 1px solid rgba(138,180,255,0.2);
+    color: var(--text);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+  }
+  .ai-msg.user {
+    background: rgba(199,138,255,0.15);
+    border: 1px solid rgba(199,138,255,0.25);
+    color: var(--text);
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+  }
+  .ai-msg.bot .speak-btn {
+    position: absolute;
+    bottom: -8px;
+    right: -8px;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    font-size: 10px;
+    cursor: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .ai-msg.bot:hover .speak-btn {
+    opacity: 1;
+  }
+  .ai-msg.typing {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .ai-msg.typing .dot {
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: typing 1.4s infinite;
+  }
+  .ai-msg.typing .dot:nth-child(2) { animation-delay: 0.2s; }
+  .ai-msg.typing .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typing {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-6px); opacity: 1; }
+  }
+  #ai-panel .ai-input-wrap {
+    padding: 12px;
+    border-top: 1px solid var(--card-border);
+    display: flex;
+    gap: 8px;
+  }
+  #ai-input {
+    flex: 1;
+    padding: 10px 14px;
+    background: rgba(0,0,0,0.2);
+    border: 1px solid var(--card-border);
+    border-radius: 100px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12px;
+    outline: none;
+    cursor: none;
+    transition: border-color 0.3s;
+  }
+  #ai-input:focus {
+    border-color: var(--accent);
+  }
+  #ai-input::placeholder {
+    color: var(--text-faint);
+  }
+  #ai-send {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: 1px solid var(--card-border);
+    background: rgba(138,180,255,0.15);
+    color: var(--accent);
+    font-size: 14px;
+    cursor: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+    flex-shrink: 0;
+  }
+  #ai-send:hover {
+    background: rgba(138,180,255,0.3);
+    border-color: var(--accent);
+  }
+  #ai-send:disabled {
+    opacity: 0.3;
+    cursor: none;
+  }
+
+  #record-toggle {
+    position: fixed;
+    bottom: 24px; right: 248px;
+    z-index: 100;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    color: var(--text);
+    font-size: 16px;
+    cursor: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+  }
+  #record-toggle:hover {
+    border-color: var(--accent);
+    background: rgba(138,180,255,0.1);
+  }
+  #record-toggle.recording {
+    border-color: #ff4444;
+    background: rgba(255,68,68,0.2);
+    color: #ff4444;
+    animation: recPulse 1s infinite;
+  }
+  #record-toggle.playing {
+    border-color: #4ade80;
+    background: rgba(74,222,128,0.2);
+    color: #4ade80;
+  }
+  @keyframes recPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,68,68,0.5); }
+    50% { box-shadow: 0 0 0 10px rgba(255,68,68,0); }
+  }
+
+  .ctrl-btn {
+    position: fixed;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    color: var(--text);
+    font-size: 16px;
+    cursor: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+    z-index: 100;
+  }
+  .ctrl-btn:hover {
+    border-color: var(--accent);
+    background: rgba(138,180,255,0.1);
+    box-shadow: 0 0 30px rgba(138,180,255,0.3);
+  }
+  #sound-toggle { bottom: 24px; right: 24px; }
+  #theme-toggle { bottom: 24px; right: 80px; }
+  #gyro-toggle { bottom: 24px; right: 136px; }
+
+  #loader {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: var(--bg);
+    z-index: 100000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.8s, visibility 0.8s, background 0.6s;
+  }
+  #loader.hidden {
+    opacity: 0;
+    visibility: hidden;
+  }
+  #loader .load-text {
+    font-size: 12px;
+    letter-spacing: 6px;
+    color: var(--accent);
+    margin-bottom: 24px;
+    text-transform: uppercase;
+  }
+  #loader .load-bar {
+    width: 240px;
+    height: 1px;
+    background: rgba(255,255,255,0.1);
+    position: relative;
+    overflow: hidden;
+  }
+  #loader .load-bar::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    animation: loadFill 2s ease forwards;
+  }
+  @keyframes loadFill {
+    to { width: 100%; }
+  }
+  #loader .load-percent {
+    margin-top: 16px;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--text-faint);
+  }
+  #loader .gen-seed {
+    margin-top: 30px;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--text-faint);
+  }
+
+  #enter-btn {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 6;
+    margin-top: 120px;
+    padding: 14px 40px;
+    border: 1px solid var(--card-border);
+    border-radius: 100px;
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    cursor: none;
+    transition: all 0.4s;
+  }
+  #enter-btn:hover {
+    border-color: var(--accent);
+    background: rgba(138,180,255,0.1);
+    letter-spacing: 7px;
+    box-shadow: 0 0 40px rgba(138,180,255,0.3);
+  }
+  #enter-btn.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+
+  .footer-hint {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.8s;
+  }
+  .footer-hint.visible { opacity: 1; }
+
+  #transition-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    z-index: 99998;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+  }
+  #transition-overlay.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  #transition-overlay .overlay-bg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(var(--bg-rgb), 0);
+    backdrop-filter: blur(0px);
+    transition: background 0.6s, backdrop-filter 0.6s;
+  }
+  #transition-overlay.active .overlay-bg {
+    background: rgba(var(--bg-rgb), 0.95);
+    backdrop-filter: blur(30px) saturate(180%);
+  }
+  #transition-overlay .ring {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 10px; height: 10px;
+    border: 1px solid var(--accent);
+    border-radius: 50%;
+    opacity: 0;
+  }
+  #transition-overlay.active .ring {
+    animation: ringExpand 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+  #transition-overlay .ring:nth-child(2) {
+    animation-delay: 0.15s;
+    border-color: var(--accent2);
+  }
+  #transition-overlay .ring:nth-child(3) {
+    animation-delay: 0.3s;
+    border-color: var(--text);
+  }
+  @keyframes ringExpand {
+    0% { width: 10px; height: 10px; opacity: 1; border-width: 2px; }
+    100% { width: 120vw; height: 120vw; opacity: 0; border-width: 1px; }
+  }
+  #transition-overlay .overlay-text {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  #transition-overlay.active .overlay-text {
+    opacity: 1;
+    transition-delay: 0.4s;
+  }
+  #transition-overlay .overlay-text .label {
+    font-size: 11px;
+    letter-spacing: 8px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    animation: textPulse 1.5s ease infinite;
+  }
+  @keyframes textPulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+  #transition-overlay .overlay-text .target {
+    font-size: clamp(1.5rem, 4vw, 2.5rem);
+    font-weight: 200;
+    letter-spacing: 0.3em;
+    color: var(--text);
+  }
+  #transition-overlay .overlay-text .url {
+    margin-top: 20px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    opacity: 0.6;
+    word-break: break-all;
+    max-width: 80vw;
+  }
+  #transition-overlay .progress-bar {
+    position: absolute;
+    bottom: 15%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(60vw, 400px);
+    height: 1px;
+    background: rgba(255,255,255,0.1);
+    overflow: hidden;
+  }
+  #transition-overlay .progress-fill {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    box-shadow: 0 0 20px var(--accent);
+  }
+  #transition-overlay.active .progress-fill {
+    animation: progressFill 1.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+  @keyframes progressFill {
+    0% { width: 0; }
+    100% { width: 100%; }
+  }
+
+  #record-indicator {
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10000;
+    padding: 6px 16px;
+    border-radius: 100px;
+    background: rgba(255,68,68,0.9);
+    color: #fff;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    box-shadow: 0 0 30px rgba(255,68,68,0.6);
+  }
+  #record-indicator.active {
+    opacity: 1;
+    animation: recPulse 1s infinite;
+  }
+  #record-indicator .dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    background: #fff;
+    border-radius: 50%;
+    margin-right: 8px;
+    animation: blink 0.8s infinite;
+  }
+
+  #touch-hint {
+    position: fixed;
+    bottom: 130px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 8;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.6s;
+    text-align: center;
+  }
+  #touch-hint.visible { opacity: 0.6; }
+
+  /* AI 推薦提示 Toast */
+  #rec-toast {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.8);
+    z-index: 99999;
+    padding: 20px 36px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,170,0,0.1));
+    backdrop-filter: blur(30px);
+    border: 1px solid rgba(255,215,0,0.5);
+    color: #ffd700;
+    font-size: 13px;
+    letter-spacing: 3px;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 60px rgba(255,215,0,0.4);
+  }
+  #rec-toast.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  #rec-toast .rec-icon {
+    font-size: 28px;
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  @media (max-width: 700px) {
+    .nav-grid { grid-template-columns: 1fr; gap: 16px; width: 92vw; }
+    .hud { font-size: 9px; }
+    .nav-card { padding: 24px 20px; }
+    .card-wrap { height: 260px; }
+    #ai-panel { width: calc(100vw - 32px); right: 16px; }
+    #ai-toggle { right: 136px; bottom: 80px; }
+    #record-toggle { right: 80px; bottom: 80px; }
+    #gyro-toggle { right: 24px; bottom: 80px; }
+    #theme-toggle { right: 192px; bottom: 80px; }
+    #sound-toggle { right: 248px; bottom: 80px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- V20：背景影片 -->
+<video id="bg-video" autoplay muted loop playsinline>
+  <source src="https://cdn.pixabay.com/video/2023/10/22/186004-877365906_large.mp4" type="video/mp4">
+</video>
+
+<div id="loader">
+  <div class="load-text">GENERATING</div>
+  <div class="load-bar"></div>
+  <div class="load-percent">LOADING IMMERSIVE SYSTEM...</div>
+  <div class="gen-seed" id="genSeed">SEED: --------</div>
+</div>
+
+<canvas id="gesture-canvas" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9998;pointer-events:none;"></canvas>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-dot" id="cursorDot"></div>
+
+<div class="hud hud-tl" id="hudCoords">X:0000 Y:0000</div>
+<div class="hud hud-tr">
+  <div class="clock-time" id="hudClock">--:--:--</div>
+  <div id="hudDate">----/--/--</div>
+</div>
+<div class="hud hud-bl">
+  <span id="weatherIcon">◌</span>
+  <span id="weatherText">載入中...</span>
+</div>
+<div class="hud hud-br" id="hudBpm">BPM:090</div>
+
+<div class="title-bar" id="titleBar">
+  <h1 id="particleTitle">展商城</h1>
+  <div class="sub">IMMERSIVE EXPERIENCE<span class="cursor-blink"></span></div>
+</div>
+
+<button id="enter-btn">點擊進入</button>
+
+<div class="nav-grid" id="navGrid">
+  <div class="card-wrap" data-href="https://zahisgood-spec.github.io/business-dashboard/shop.html" data-title="顧客開單" data-id="shop">
+    <a class="nav-card card-front" href="https://zahisgood-spec.github.io/business-dashboard/shop.html">
+      <div class="reflect-layer"></div>
+      <div class="highlight"></div>
+      <div class="card-num">01 / SHOP</div>
+      <div class="card-title">顧客開單</div>
+      <div class="card-desc">進入商城，挑選商品，建立訂單。</div>
+      <div class="card-url">shop.html</div>
+      <div class="card-arrow">→</div>
+    </a>
+    <div class="nav-card card-back">
+      <div class="back-icon">▸</div>
+      <div class="back-label">READY TO OPEN</div>
+      <div class="back-title">顧客開單</div>
+      <div class="back-hint">點擊開啟新分頁</div>
+    </div>
+  </div>
+
+  <div class="card-wrap" data-href="https://zahisgood-spec.github.io/business-dashboard/rate.html" data-title="訂單評價與查詢" data-id="rate">
+    <a class="nav-card card-front" href="https://zahisgood-spec.github.io/business-dashboard/rate.html">
+      <div class="reflect-layer"></div>
+      <div class="highlight"></div>
+      <div class="card-num">02 / RATE</div>
+      <div class="card-title">訂單評價與查詢</div>
+      <div class="card-desc">查詢訂單狀態，留下你的評價。</div>
+      <div class="card-url">rate.html</div>
+      <div class="card-arrow">→</div>
+    </a>
+    <div class="nav-card card-back">
+      <div class="back-icon">▸</div>
+      <div class="back-label">READY TO OPEN</div>
+      <div class="back-title">訂單評價與查詢</div>
+      <div class="back-hint">點擊開啟新分頁</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer-hint" id="footerHint">▸ 點進網站小卡，即可開始使用 ◂</div>
+<div id="touch-hint">雙指縮放 · 旋轉 · 拖曳</div>
+
+<div id="audio-viz"></div>
+
+<button class="ctrl-btn" id="sound-toggle">🔊</button>
+<button class="ctrl-btn" id="theme-toggle">🌙</button>
+<button class="ctrl-btn" id="gyro-toggle">📱</button>
+<button class="ctrl-btn" id="ai-toggle">💬</button>
+<button class="ctrl-btn" id="record-toggle">⏺</button>
+
+<div id="ai-panel">
+  <div class="ai-header">
+    <div class="ai-title">AI 助理</div>
+    <div class="ai-actions">
+      <button id="voice-toggle" title="語音回覆">🔈</button>
+      <div class="ai-status"><span class="dot"></span>ONLINE</div>
+    </div>
+  </div>
+  <div class="ai-messages" id="aiMessages"></div>
+  <div class="ai-input-wrap">
+    <input type="text" id="ai-input" placeholder="問我任何問題..." autocomplete="off">
+    <button id="ai-send">▸</button>
+  </div>
+</div>
+
+<div id="record-panel" style="position:fixed;bottom:80px;right:24px;width:280px;z-index:999;background:var(--card-bg);backdrop-filter:blur(30px) saturate(180%);border:1px solid var(--card-border);border-radius:16px;padding:16px;opacity:0;visibility:hidden;transform:translateY(20px);transition:all 0.4s cubic-bezier(0.4,0,0.2,1);box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+  <div style="font-size:11px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;margin-bottom:12px;">軌跡錄製</div>
+  <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;display:flex;justify-content:space-between;"><span>狀態</span><span class="val" id="recStatus" style="color:var(--accent);font-weight:bold;">待機</span></div>
+  <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;display:flex;justify-content:space-between;"><span>點數</span><span class="val" id="recPoints" style="color:var(--accent);font-weight:bold;">0</span></div>
+  <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;display:flex;justify-content:space-between;"><span>時長</span><span class="val" id="recDuration" style="color:var(--accent);font-weight:bold;">0.0s</span></div>
+  <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;display:flex;justify-content:space-between;"><span>已儲存</span><span class="val" id="recSaved" style="color:var(--accent);font-weight:bold;">0</span></div>
+  <div style="display:flex;gap:8px;margin-top:14px;">
+    <button class="rec-btn" id="recPlayBtn" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--card-border);background:rgba(138,180,255,0.1);color:var(--text);font-family:inherit;font-size:11px;letter-spacing:1px;cursor:none;transition:all 0.3s;">▶ 播放</button>
+    <button class="rec-btn danger" id="recClearBtn" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,68,68,0.3);background:rgba(255,68,68,0.1);color:#ff6666;font-family:inherit;font-size:11px;letter-spacing:1px;cursor:none;transition:all 0.3s;">✕ 清除</button>
+  </div>
+</div>
+
+<div id="record-indicator"><span class="dot"></span>RECORDING</div>
+
+<div id="rec-toast">
+  <span class="rec-icon">✦</span>
+  <div id="recToastText">AI 推薦</div>
+</div>
+
+<div id="transition-overlay">
+  <div class="overlay-bg"></div>
+  <div class="ring"></div>
+  <div class="ring"></div>
+  <div class="ring"></div>
+  <div class="overlay-text">
+    <div class="label">CONNECTING</div>
+    <div class="target" id="overlayTarget">載入中</div>
+    <div class="url" id="overlayUrl"></div>
+  </div>
+  <div class="progress-bar">
+    <div class="progress-fill"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<script>
+/* ============================================================
+   ⚠️ 把下面的 API KEY 換成你自己的新 KEY
+   ============================================================ */
+const GEMINI_API_KEY = 'YOUR_NEW_API_KEY_HERE';
+const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+/* ============================================================
+   0. 種子
+   ============================================================ */
+const SEED = Math.floor(Math.random() * 99999999);
+document.getElementById('genSeed').textContent = 'SEED: ' + SEED.toString(16).toUpperCase().padStart(8, '0');
+let seedState = SEED;
+function seededRandom() {
+  seedState = (seedState * 9301 + 49297) % 233280;
+  return seedState / 233280;
+}
+
+/* ============================================================
+   1. 音效系統（含 A20 回音空間）
+   ============================================================ */
+let audioCtx = null, masterGain = null, musicGain = null, sfxGain = null;
+let convolver = null, wetGain = null, dryGain = null;
+let analyser = null, dataArray = null;
+let isAudioOn = false;
+let volumeLevel = 0.5;
+let currentScale = [0, 2, 4, 7, 9];
+let musicIntensity = 0, targetIntensity = 0;
+let bpm = 90, beatCount = 0;
+
+const vizEl = document.getElementById('audio-viz');
+for (let i = 0; i < 36; i++) {
+  const bar = document.createElement('div');
+  bar.className = 'bar';
+  vizEl.appendChild(bar);
+}
+const vizBars = vizEl.querySelectorAll('.bar');
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = volumeLevel;
+  masterGain.connect(audioCtx.destination);
+
+  // A20：建立回音空間
+  convolver = audioCtx.createConvolver();
+  convolver.buffer = createReverbImpulse(audioCtx, 3.5, 2.5);
+  wetGain = audioCtx.createGain();
+  wetGain.gain.value = 0.35;
+  dryGain = audioCtx.createGain();
+  dryGain.gain.value = 0.7;
+
+  // 混音架構：來源 → dryGain → master；來源 → convolver → wetGain → master
+  dryGain.connect(masterGain);
+  convolver.connect(wetGain);
+  wetGain.connect(masterGain);
+
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 64;
+  dataArray = new Uint8Array(analyser.frequencyBinCount);
+  analyser.connect(masterGain);
+
+  musicGain = audioCtx.createGain();
+  musicGain.gain.value = 0.35;
+  musicGain.connect(dryGain);
+  musicGain.connect(convolver);
+
+  sfxGain = audioCtx.createGain();
+  sfxGain.gain.value = 0.5;
+  sfxGain.connect(dryGain);
+  sfxGain.connect(convolver);
+
+  startAmbientMusic();
+  startBeatLoop();
+  isAudioOn = true;
+  setTimeout(() => vizEl.classList.add('visible'), 500);
+}
+
+/* A20：產生脈衝響應（模擬大教堂 / 洞穴） */
+function createReverbImpulse(ctx, duration, decay) {
+  const rate = ctx.sampleRate;
+  const length = rate * duration;
+  const impulse = ctx.createBuffer(2, length, rate);
+  for (let ch = 0; ch < 2; ch++) {
+    const data = impulse.getChannelData(ch);
+    for (let i = 0; i < length; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+    }
+  }
+  return impulse;
+}
+
+function startAmbientMusic() {
+  const baseFreq = 110;
+  const intervals = [1, 1.5, 2, 3];
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 800;
+  filter.connect(musicGain);
+  intervals.forEach((mult, i) => {
+    const osc = audioCtx.createOscillator();
+    osc.type = i % 2 === 0 ? 'sine' : 'triangle';
+    osc.frequency.value = baseFreq * mult;
+    const g = audioCtx.createGain();
+    g.gain.value = 0.08;
+    osc.connect(g); g.connect(filter); osc.start();
+    const lfo = audioCtx.createOscillator();
+    lfo.frequency.value = 0.05 + i * 0.03;
+    const lfoGain = audioCtx.createGain();
+    lfoGain.gain.value = 0.04;
+    lfo.connect(lfoGain); lfoGain.connect(g.gain); lfo.start();
+  });
+  scheduleArpeggio();
+}
+
+function scheduleArpeggio() {
+  setTimeout(() => {
+    if (!isAudioOn) return;
+    playArpeggio();
+    scheduleArpeggio();
+  }, 800 + Math.random() * 2000);
+}
+
+function playArpeggio() {
+  const baseFreq = 220 * Math.pow(2, Math.floor(Math.random() * 3));
+  const note = currentScale[Math.floor(Math.random() * currentScale.length)];
+  const freq = baseFreq * Math.pow(2, note / 12);
+  const osc = audioCtx.createOscillator();
+  osc.type = 'sine'; osc.frequency.value = freq;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0, audioCtx.currentTime);
+  g.gain.linearRampToValueAtTime(0.15 + musicIntensity * 0.1, audioCtx.currentTime + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 2.5);
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass'; filter.frequency.value = 2000 + musicIntensity * 3000;
+  osc.connect(g); g.connect(filter); filter.connect(musicGain);
+  osc.start(); osc.stop(audioCtx.currentTime + 2.5);
+}
+
+function startBeatLoop() {
+  function scheduleNext() {
+    if (!isAudioOn) return;
+    const beatDuration = 60 / bpm;
+    playBeat(beatCount);
+    beatCount++;
+    setTimeout(scheduleNext, beatDuration * 1000);
+  }
+  scheduleNext();
+}
+
+function playBeat(beat) {
+  const inBar = beat % 4;
+  if (inBar === 0 || inBar === 2) playKick();
+  if (inBar === 1 || inBar === 3) playSnare();
+  playHiHat(inBar === 1 || inBar === 3 ? 0.05 : 0.03);
+  bpm = 90 + Math.floor(musicIntensity * 40);
+  document.getElementById('hudBpm').textContent = `BPM:${String(bpm).padStart(3, '0')}`;
+}
+
+function playKick() {
+  if (!isAudioOn) return;
+  const osc = audioCtx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.15);
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0.5 + musicIntensity * 0.3, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+  osc.connect(g); g.connect(musicGain);
+  osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+}
+
+function playSnare() {
+  if (!isAudioOn) return;
+  const bufferSize = audioCtx.sampleRate * 0.2;
+  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2);
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = buffer;
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'highpass'; filter.frequency.value = 1000;
+  const g = audioCtx.createGain();
+  g.gain.value = 0.15 + musicIntensity * 0.1;
+  noise.connect(filter); filter.connect(g); g.connect(musicGain);
+  noise.start();
+}
+
+function playHiHat(vol) {
+  if (!isAudioOn) return;
+  const bufferSize = audioCtx.sampleRate * 0.05;
+  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 3);
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = buffer;
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'highpass'; filter.frequency.value = 7000;
+  const g = audioCtx.createGain();
+  g.gain.value = vol;
+  noise.connect(filter); filter.connect(g); g.connect(musicGain);
+  noise.start();
+}
+
+function playHoverSound() {
+  if (!isAudioOn) return;
+  const osc = audioCtx.createOscillator();
+  osc.type = 'sine'; osc.frequency.value = 880;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0, audioCtx.currentTime);
+  g.gain.linearRampToValueAtTime(0.05, audioCtx.currentTime + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+  osc.connect(g); g.connect(sfxGain);
+  osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+}
+
+function playFlipSound() {
+  if (!isAudioOn) return;
+  const osc = audioCtx.createOscillator();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.25);
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0, audioCtx.currentTime);
+  g.gain.linearRampToValueAtTime(0.12, audioCtx.currentTime + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'bandpass'; filter.frequency.value = 800; filter.Q.value = 3;
+  osc.connect(filter); filter.connect(g); g.connect(sfxGain);
+  osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+}
+
+function playEnterSound() {
+  if (!isAudioOn) return;
+  [0, 7, 12, 19].forEach((semi, i) => {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = 330 * Math.pow(2, semi / 12);
+    const g = audioCtx.createGain();
+    const t = audioCtx.currentTime + i * 0.08;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.2, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+    osc.connect(g); g.connect(sfxGain);
+    osc.start(t); osc.stop(t + 1.2);
+  });
+}
+
+function playTransitionSound() {
+  if (!isAudioOn) return;
+  [0, 4, 7, 12, 16, 19, 24].forEach((semi, i) => {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = 220 * Math.pow(2, semi / 12);
+    const g = audioCtx.createGain();
+    const t = audioCtx.currentTime + i * 0.08;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.18, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+    osc.connect(g); g.connect(sfxGain);
+    osc.start(t); osc.stop(t + 0.8);
+  });
+}
+
+function playOpenSound() {
+  if (!isAudioOn) return;
+  [0, 12, 24].forEach((semi, i) => {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = 440 * Math.pow(2, semi / 12);
+    const g = audioCtx.createGain();
+    const t = audioCtx.currentTime + i * 0.06;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.25, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 1.5);
+    osc.connect(g); g.connect(sfxGain);
+    osc.start(t); osc.stop(t + 1.5);
+  });
+}
+
+function playChatSound() {
+  if (!isAudioOn) return;
+  const osc = audioCtx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+  osc.frequency.linearRampToValueAtTime(1320, audioCtx.currentTime + 0.1);
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0, audioCtx.currentTime);
+  g.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+  osc.connect(g); g.connect(sfxGain);
+  osc.start(); osc.stop(audioCtx.currentTime + 0.25);
+}
+
+function playRecSound() {
+  if (!isAudioOn) return;
+  [0, 5, 12, 17].forEach((semi, i) => {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = 660 * Math.pow(2, semi / 12);
+    const g = audioCtx.createGain();
+    const t = audioCtx.currentTime + i * 0.07;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.18, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+    osc.connect(g); g.connect(sfxGain);
+    osc.start(t); osc.stop(t + 0.8);
+  });
+}
+
+function playSpatialSound(x, y, freq, duration = 0.5) {
+  if (!isAudioOn) return;
+  const osc = audioCtx.createOscillator();
+  osc.type = 'sine'; osc.frequency.value = freq;
+  const panner = audioCtx.createPanner();
+  panner.panningModel = 'HRTF';
+  panner.distanceModel = 'inverse';
+  panner.refDistance = 1;
+  panner.maxDistance = 10000;
+  panner.rolloffFactor = 1;
+  const x3d = (x / window.innerWidth) * 20 - 10;
+  const y3d = -((y / window.innerHeight) * 20 - 10);
+  if (panner.positionX) {
+    panner.positionX.value = x3d;
+    panner.positionY.value = y3d;
+    panner.positionZ.value = 0;
+  } else {
+    panner.setPosition(x3d, y3d, 0);
+  }
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0, audioCtx.currentTime);
+  g.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+  osc.connect(g); g.connect(panner); panner.connect(sfxGain);
+  osc.start(); osc.stop(audioCtx.currentTime + duration);
+}
+
+/* ============================================================
+   2. 語音導航 + AI2 語音回覆
+   ============================================================ */
+let chineseVoice = null;
+let voicesLoaded = false;
+let voiceReplyEnabled = false;
+function loadVoices() {
+  const voices = window.speechSynthesis.getVoices();
+  chineseVoice = voices.find(v => v.lang.includes('zh-TW')) ||
+                 voices.find(v => v.lang.includes('zh')) ||
+                 voices.find(v => v.lang.includes('en'));
+  voicesLoaded = true;
+}
+if ('speechSynthesis' in window) {
+  window.speechSynthesis.onvoiceschanged = loadVoices;
+  loadVoices();
+}
+function speak(text) {
+  if (!('speechSynthesis' in window)) return;
+  if (!voicesLoaded) loadVoices();
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'zh-TW';
+  utter.rate = 1.1;
+  utter.pitch = 1.0;
+  utter.volume = 0.8;
+  if (chineseVoice) utter.voice = chineseVoice;
+  window.speechSynthesis.speak(utter);
+}
+
+/* AI2：AI 回覆語音朗讀 */
+function speakAIReply(text) {
+  if (!voiceReplyEnabled) return;
+  if (!('speechSynthesis' in window)) return;
+  if (!voicesLoaded) loadVoices();
+  window.speechSynthesis.cancel();
+  // 移除 emoji 和特殊符號
+  const cleanText = text.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').replace(/[✦▸◯▲✓⚡]/g, '').trim();
+  const utter = new SpeechSynthesisUtterance(cleanText);
+  utter.lang = 'zh-TW';
+  utter.rate = 1.15;
+  utter.pitch = 1.05;
+  utter.volume = 0.9;
+  if (chineseVoice) utter.voice = chineseVoice;
+  utter.onstart = () => aiToggle.classList.add('speaking');
+  utter.onend = () => aiToggle.classList.remove('speaking');
+  window.speechSynthesis.speak(utter);
+}
+
+/* ============================================================
+   3. 深淺主題
+   ============================================================ */
+const themeToggle = document.getElementById('theme-toggle');
+let currentTheme = localStorage.getItem('theme') || 'dark';
+if (currentTheme === 'light') document.body.setAttribute('data-theme', 'light');
+themeToggle.textContent = currentTheme === 'dark' ? '🌙' : '☀️';
+
+themeToggle.addEventListener('click', () => {
+  currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  if (currentTheme === 'dark') document.body.removeAttribute('data-theme');
+  else document.body.setAttribute('data-theme', 'light');
+  themeToggle.textContent = currentTheme === 'dark' ? '🌙' : '☀️';
+  localStorage.setItem('theme', currentTheme);
+  updateThreeTheme();
+  playHoverSound();
+});
+
+/* ============================================================
+   4. 時鐘 + 天氣
+   ============================================================ */
+const hudClock = document.getElementById('hudClock');
+const hudDate = document.getElementById('hudDate');
+function updateClock() {
+  const now = new Date();
+  hudClock.textContent = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+  hudDate.textContent = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+const weatherIcon = document.getElementById('weatherIcon');
+const weatherText = document.getElementById('weatherText');
+const weatherCodes = {
+  0: { icon: '☀', text: '晴朗' }, 1: { icon: '◐', text: '多雲時晴' },
+  2: { icon: '◑', text: '多雲' }, 3: { icon: '☁', text: '陰天' },
+  45: { icon: '≡', text: '霧' }, 51: { icon: '☂', text: '毛毛雨' },
+  61: { icon: '☔', text: '小雨' }, 63: { icon: '☔', text: '中雨' },
+  65: { icon: '☔', text: '大雨' }, 80: { icon: '☔', text: '陣雨' },
+  95: { icon: '⚡', text: '雷雨' }
+};
+async function fetchWeather(lat, lon) {
+  try {
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+    const data = await res.json();
+    const code = data.current_weather.weathercode;
+    const temp = Math.round(data.current_weather.temperature);
+    const info = weatherCodes[code] || { icon: '◌', text: '未知' };
+    weatherIcon.textContent = info.icon;
+    weatherText.textContent = `${info.text} ${temp}°C`;
+  } catch (e) { weatherText.textContent = '天氣載入失敗'; }
+}
+fetchWeather(25.0330, 121.5654);
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(
+    pos => fetchWeather(pos.coords.latitude, pos.coords.longitude),
+    () => {}, { timeout: 5000 }
+  );
+}
+
+/* ============================================================
+   5. X2 AI 聊天 + AI2 語音 + AI5 推薦
+   ============================================================ */
+const SYSTEM_PROMPT = `你是「展商城」網站的 AI 助理。
+網站有兩個主要功能：
+1. 顧客開單（shop.html，id: shop）：進入商城挑選商品建立訂單
+2. 訂單評價與查詢（rate.html，id: rate）：查詢訂單狀態、填寫評價
+
+網站特色：
+- 3D 互動場景、粒子文字、極光、背景影片
+- 卡片 3D 翻轉、液態金屬邊框、光線追蹤反射
+- 語音導航、手勢彩蛋（畫圓、畫 Z、畫 V、畫三角形）
+- 滑鼠軌跡錄製、播放
+- 手機雙指縮放旋轉
+- 深淺主題切換、即時時鐘、天氣
+- 回音空間音效
+
+請用繁體中文、親切、簡潔地回答。回覆不要超過 80 字。
+如果問到網站相關問題，引導使用者使用上述功能。
+如果問到無關的問題，可以簡短回答但引導回網站主題。
+
+【重要】在回覆最後，用以下格式標註推薦的卡片（只能選 shop 或 rate 或 none）：
+[RECOMMEND:shop]
+或
+[RECOMMEND:rate]
+或
+[RECOMMEND:none]
+
+例如問「我要買東西」，回覆：
+「要買東西的話，點左邊的『顧客開單』卡片，就可以挑選商品建立訂單 📦
+[RECOMMEND:shop]」`;
+
+const aiToggle = document.getElementById('ai-toggle');
+const aiPanel = document.getElementById('ai-panel');
+const aiMessages = document.getElementById('aiMessages');
+const aiInput = document.getElementById('ai-input');
+const aiSend = document.getElementById('ai-send');
+const voiceToggle = document.getElementById('voice-toggle');
+
+let aiOpen = false;
+let aiHistory = [];
+let aiBusy = false;
+
+/* AI2：語音回覆開關 */
+voiceToggle.addEventListener('click', () => {
+  voiceReplyEnabled = !voiceReplyEnabled;
+  voiceToggle.classList.toggle('active', voiceReplyEnabled);
+  voiceToggle.textContent = voiceReplyEnabled ? '🔊' : '🔈';
+  speak(voiceReplyEnabled ? '語音回覆已開啟' : '語音回覆已關閉');
+  if (voiceReplyEnabled) {
+    aiToggle.classList.add('speaking');
+    setTimeout(() => aiToggle.classList.remove('speaking'), 1500);
+  }
+});
+
+aiToggle.addEventListener('click', () => {
+  aiOpen = !aiOpen;
+  aiPanel.classList.toggle('active', aiOpen);
+  aiToggle.classList.toggle('active', aiOpen);
+  if (aiOpen && aiMessages.children.length === 0) {
+    setTimeout(() => {
+      const greeting = '你好！我是展商城的 AI 助理 🤖 有什麼我可以幫你的嗎？';
+      addMessage(greeting, 'bot');
+      if (voiceReplyEnabled) speakAIReply(greeting);
+    }, 300);
+  }
+});
+
+function addMessage(text, role, allowSpeak = true) {
+  const msg = document.createElement('div');
+  msg.className = `ai-msg ${role}`;
+  msg.textContent = text;
+  if (role === 'bot' && allowSpeak) {
+    const btn = document.createElement('button');
+    btn.className = 'speak-btn';
+    btn.textContent = '🔊';
+    btn.title = '朗讀';
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      speak(text);
+    });
+    msg.appendChild(btn);
+  }
+  aiMessages.appendChild(msg);
+  aiMessages.scrollTop = aiMessages.scrollHeight;
+  return msg;
+}
+
+function addTyping() {
+  const msg = document.createElement('div');
+  msg.className = 'ai-msg bot typing';
+  msg.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+  aiMessages.appendChild(msg);
+  aiMessages.scrollTop = aiMessages.scrollHeight;
+  return msg;
+}
+
+/* AI5：解析 AI 回覆中的推薦 */
+function parseRecommendation(text) {
+  const match = text.match(/\[RECOMMEND:(shop|rate|none)\]/i);
+  if (match) {
+    return { cleanText: text.replace(/\[RECOMMEND:\w+\]/gi, '').trim(), target: match[1].toLowerCase() };
+  }
+  return { cleanText: text, target: null };
+}
+
+/* AI5：套用推薦到卡片 */
+function applyRecommendation(target) {
+  // 先清除所有推薦
+  document.querySelectorAll('.card-wrap').forEach(w => w.classList.remove('recommended'));
+  if (!target || target === 'none') return;
+
+  const wrap = document.querySelector(`.card-wrap[data-id="${target}"]`);
+  if (!wrap) return;
+
+  wrap.classList.add('recommended');
+
+  // 顯示 toast
+  const toast = document.getElementById('rec-toast');
+  const title = wrap.dataset.title;
+  document.getElementById('recToastText').textContent = `推薦：${title}`;
+  toast.classList.add('show');
+  playRecSound();
+  setTimeout(() => toast.classList.remove('show'), 2500);
+
+  // 3 秒後自動移除高亮（但保留，讓使用者看清楚）
+  // 這裡選擇保留，使用者點擊或問下一題才會更新
+}
+
+/* ===== 呼叫 Gemini API ===== */
+async function callGemini(userMessage) {
+  if (!GEMINI_API_KEY || GEMINI_API_KEY === 'YOUR_NEW_API_KEY_HERE') {
+    return null;
+  }
+
+  const contents = [];
+  aiHistory.slice(-6).forEach(msg => {
+    contents.push({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }]
+    });
+  });
+  contents.push({
+    role: 'user',
+    parts: [{ text: userMessage }]
+  });
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+
+    const res = await fetch(GEMINI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: {
+          parts: [{ text: SYSTEM_PROMPT }]
+        },
+        contents: contents,
+        generationConfig: {
+          temperature: 0.9,
+          maxOutputTokens: 200,
+          topP: 0.95
+        }
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      console.warn('Gemini API 錯誤:', res.status);
+      return null;
+    }
+
+    const data = await res.json();
+    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+      return data.candidates[0].content.parts[0].text.trim();
+    }
+    return null;
+  } catch (e) {
+    console.warn('Gemini 呼叫失敗:', e.message);
+    return null;
+  }
+}
+
+/* ===== 內建回覆（含推薦邏輯） ===== */
+function generateBuiltinReply(input) {
+  const q = input.toLowerCase().trim();
+
+  if (/你好|嗨|hi|hello|哈囉|安安/.test(q)) {
+    return ['你好！很高興見到你 👋', '嗨！有什麼我可以幫忙的嗎？', '哈囉！我是展商城的 AI 助理 ✨'][Math.floor(Math.random() * 3)];
+  }
+  if (/開單|下單|購買|買|商城|商品|shop/.test(q)) {
+    return '要開單的話，點擊左邊的「顧客開單」卡片，會開啟新分頁讓你挑選商品、建立訂單 📦\n[RECOMMEND:shop]';
+  }
+  if (/評價|查詢|訂單|查|rate|評分/.test(q)) {
+    return '要查詢訂單或留下評價，點擊右邊的「訂單評價與查詢」卡片 📝\n[RECOMMEND:rate]';
+  }
+  if (/錄|軌跡|重播|record|播放/.test(q)) {
+    return '點右下角的 ⏺ 按鈕可以錄製你的滑鼠軌跡，再按 ▶ 就能重播 👻\n[RECOMMEND:none]';
+  }
+  if (/觸控|手機|縮放|旋轉|touch/.test(q)) {
+    return '手機上用「雙指縮放」可以放大縮小 3D 場景 📱\n[RECOMMEND:none]';
+  }
+  if (/語音|聲音|說話|speak|voice/.test(q)) {
+    return '這個網站有語音導航，AI 回覆也能語音朗讀 🔊 點右上角 🔈 開啟\n[RECOMMEND:none]';
+  }
+  if (/主題|顏色|深色|淺色|theme/.test(q)) {
+    return '點右下角的 🌙 / ☀️ 可以切換深色 / 淺色模式 🌗\n[RECOMMEND:none]';
+  }
+  if (/音樂|音效|聲音|music|bgm|回音/.test(q)) {
+    return '背景音樂是即時生成的 🎵 有回音空間效果，像在教堂一樣\n[RECOMMEND:none]';
+  }
+  if (/你是誰|你是|ai|助理|誰/.test(q)) {
+    return '我是展商城的 AI 助理 🤖 由 Gemini 驅動\n[RECOMMEND:none]';
+  }
+  if (/推薦|建議|該點|哪個|選哪/.test(q)) {
+    // AI5：推薦邏輯
+    if (/買|購物|商品|訂單|開單/.test(q)) {
+      return '我推薦你點「顧客開單」，進去挑選商品建立訂單 📦\n[RECOMMEND:shop]';
+    }
+    if (/評價|查詢|看訂單|評分/.test(q)) {
+      return '我推薦你點「訂單評價與查詢」，查看訂單狀態 📝\n[RECOMMEND:rate]';
+    }
+    return '兩個都試試看！「顧客開單」是買東西，「訂單評價與查詢」是看訂單 💡\n[RECOMMEND:none]';
+  }
+  if (/幫我|怎麼|如何|怎麼用|使用/.test(q)) {
+    return '你可以：\n• 點卡片 → 進入商城\n• 畫手勢 → 觸發彩蛋\n• 按 💬 → 跟我聊天\n[RECOMMEND:none]';
+  }
+  if (/謝謝|感謝|thank/.test(q)) {
+    return ['不客氣！有問題再問我 😊\n[RECOMMEND:none]', '很高興能幫上忙 ✨\n[RECOMMEND:none]'][Math.floor(Math.random() * 2)];
+  }
+  if (/再見|掰|bye|拜拜/.test(q)) {
+    return '再見！祝你購物愉快 👋\n[RECOMMEND:none]';
+  }
+  if (/天氣|weather|溫度/.test(q)) {
+    return `現在的天氣是：${weatherText.textContent} 🌤️\n[RECOMMEND:none]`;
+  }
+  if (/時間|幾點|time/.test(q)) {
+    return `現在時間是 ${hudClock.textContent} ⏰\n[RECOMMEND:none]`;
+  }
+
+  const defaults = [
+    '這個問題很有意思 🤔 你可以試試點卡片、或畫手勢！\n[RECOMMEND:none]',
+    '我不太確定，但你可以問我「怎麼用」「商城」這些問題 💡\n[RECOMMEND:none]',
+    '換個方式問問看？例如「怎麼開單」✨\n[RECOMMEND:none]',
+    '試試問我網站相關的問題吧 🤖\n[RECOMMEND:none]'
+  ];
+  return defaults[Math.floor(Math.random() * defaults.length)];
+}
+
+aiSend.addEventListener('click', sendMessage);
+aiInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendMessage();
+});
+
+async function sendMessage() {
+  if (aiBusy) return;
+  const text = aiInput.value.trim();
+  if (!text) return;
+
+  aiBusy = true;
+  aiSend.disabled = true;
+
+  addMessage(text, 'user');
+  aiHistory.push({ role: 'user', content: text });
+  aiInput.value = '';
+  playChatSound();
+
+  const typingEl = addTyping();
+
+  let rawReply = await callGemini(text);
+  if (!rawReply) {
+    rawReply = generateBuiltinReply(text);
+  }
+
+  // AI5：解析推薦
+  const { cleanText, target } = parseRecommendation(rawReply);
+
+  typingEl.remove();
+  addMessage(cleanText, 'bot');
+  playChatSound();
+  aiHistory.push({ role: 'assistant', content: cleanText });
+
+  // AI2：語音朗讀
+  if (voiceReplyEnabled) {
+    speakAIReply(cleanText);
+  }
+
+  // AI5：套用推薦
+  if (target) {
+    applyRecommendation(target);
+  }
+
+  aiBusy = false;
+  aiSend.disabled = false;
+  aiInput.focus();
+}
+
+/* 點擊機器人訊息的朗讀按鈕 */
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('speak-btn')) {
+    const msg = e.target.closest('.ai-msg');
+    if (msg) {
+      speak(msg.textContent.replace('🔊', '').trim());
+    }
+  }
+});
+
+/* ============================================================
+   6. M8 滑鼠軌跡錄製
+   ============================================================ */
+const recordToggle = document.getElementById('record-toggle');
+const recordPanel = document.getElementById('record-panel');
+const recStatus = document.getElementById('recStatus');
+const recPoints = document.getElementById('recPoints');
+const recDuration = document.getElementById('recDuration');
+const recSaved = document.getElementById('recSaved');
+const recPlayBtn = document.getElementById('recPlayBtn');
+const recClearBtn = document.getElementById('recClearBtn');
+const recordIndicator = document.getElementById('record-indicator');
+
+let recordState = 'idle';
+let recordedPath = [];
+let recordStartTime = 0;
+let savedPaths = JSON.parse(localStorage.getItem('zhanPaths') || '[]');
+let playStartTime = 0;
+let playbackGhost = null;
+
+recSaved.textContent = savedPaths.length;
+
+recordToggle.addEventListener('click', () => {
+  if (recordState === 'recording') {
+    stopRecording();
+  } else if (recordState === 'idle') {
+    startRecording();
+    recordPanel.style.opacity = '1';
+    recordPanel.style.visibility = 'visible';
+    recordPanel.style.transform = 'translateY(0)';
+    setTimeout(() => {
+      recordPanel.style.opacity = '0';
+      recordPanel.style.visibility = 'hidden';
+      recordPanel.style.transform = 'translateY(20px)';
+    }, 4000);
+  }
+});
+
+function startRecording() {
+  recordState = 'recording';
+  recordedPath = [];
+  recordStartTime = Date.now();
+  recordToggle.classList.add('recording');
+  recordToggle.classList.remove('playing');
+  recordIndicator.classList.add('active');
+  recStatus.textContent = '錄製中';
+  recStatus.style.color = '#ff4444';
+  speak('開始錄製');
+}
+
+function stopRecording() {
+  recordState = 'idle';
+  recordToggle.classList.remove('recording');
+  recordIndicator.classList.remove('active');
+  recStatus.textContent = '待機';
+  recStatus.style.color = '';
+  if (recordedPath.length > 5) {
+    savedPaths.push({
+      points: recordedPath.slice(),
+      duration: Date.now() - recordStartTime,
+      created: Date.now()
+    });
+    if (savedPaths.length > 5) savedPaths.shift();
+    localStorage.setItem('zhanPaths', JSON.stringify(savedPaths));
+    recSaved.textContent = savedPaths.length;
+    speak('錄製完成');
+  } else {
+    speak('軌跡太短');
+  }
+}
+
+document.addEventListener('mousemove', e => {
+  if (recordState === 'recording') {
+    recordedPath.push({ x: e.clientX, y: e.clientY, t: Date.now() - recordStartTime });
+    recPoints.textContent = recordedPath.length;
+    recDuration.textContent = ((Date.now() - recordStartTime) / 1000).toFixed(1) + 's';
+  }
+});
+
+recPlayBtn.addEventListener('click', () => {
+  if (recordState === 'playing') return;
+  if (savedPaths.length === 0) {
+    speak('沒有儲存的軌跡');
+    return;
+  }
+  playPath(savedPaths[savedPaths.length - 1]);
+});
+
+function playPath(path) {
+  recordState = 'playing';
+  recordToggle.classList.add('playing');
+  recordToggle.classList.remove('recording');
+  recStatus.textContent = '播放中';
+  recStatus.style.color = '#4ade80';
+  playStartTime = Date.now();
+
+  if (!playbackGhost) {
+    playbackGhost = document.createElement('div');
+    playbackGhost.style.cssText = `
+      position: fixed;
+      width: 30px; height: 30px;
+      border: 2px solid #4ade80;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 99999;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 20px #4ade80, inset 0 0 10px rgba(74,222,128,0.5);
+      transition: opacity 0.3s;
+      opacity: 0;
+    `;
+    document.body.appendChild(playbackGhost);
+  }
+  playbackGhost.style.opacity = '1';
+  speak('播放軌跡');
+
+  let i = 0;
+  function step() {
+    if (recordState !== 'playing') return;
+    const now = Date.now() - playStartTime;
+    while (i < path.points.length && path.points[i].t <= now) {
+      const p = path.points[i];
+      playbackGhost.style.left = p.x + 'px';
+      playbackGhost.style.top = p.y + 'px';
+      if (typeof particles !== 'undefined' && frameCount % 3 === 0) {
+        particles.push({
+          x: p.x, y: p.y,
+          vx: random(-1, 1), vy: random(-1, 1),
+          size: random(2, 5), life: 200,
+          colorIdx: floor(random(3))
+        });
+      }
+      i++;
+    }
+    if (i < path.points.length) {
+      requestAnimationFrame(step);
+    } else {
+      stopPlayback();
+    }
+  }
+  step();
+}
+
+function stopPlayback() {
+  recordState = 'idle';
+  recordToggle.classList.remove('playing');
+  recStatus.textContent = '待機';
+  recStatus.style.color = '';
+  if (playbackGhost) playbackGhost.style.opacity = '0';
+}
+
+recClearBtn.addEventListener('click', () => {
+  if (confirm('確定清除所有儲存的軌跡嗎？')) {
+    savedPaths = [];
+    localStorage.removeItem('zhanPaths');
+    recSaved.textContent = '0';
+    recPoints.textContent = '0';
+    recDuration.textContent = '0.0s';
+    speak('已清除');
+  }
+});
+
+/* ============================================================
+   7. 自訂游標
+   ============================================================ */
+const cursorEl = document.getElementById('cursor');
+const cursorDot = document.getElementById('cursorDot');
+document.addEventListener('mousemove', e => {
+  cursorEl.style.left = e.clientX + 'px';
+  cursorEl.style.top = e.clientY + 'px';
+  cursorDot.style.left = e.clientX + 'px';
+  cursorDot.style.top = e.clientY + 'px';
+
+  // V26：更新卡片光線追蹤高光
+  document.querySelectorAll('.card-wrap').forEach(wrap => {
+    const rect = wrap.getBoundingClientRect();
+    const hl = wrap.querySelector('.highlight');
+    if (hl) {
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      hl.style.left = x + 'px';
+      hl.style.top = y + 'px';
+    }
+  });
+});
+document.addEventListener('mousedown', () => cursorEl.classList.add('active'));
+document.addEventListener('mouseup', () => cursorEl.classList.remove('active'));
+
+document.addEventListener('mousemove', e => {
+  const x = String(Math.floor(e.clientX)).padStart(4, '0');
+  const y = String(Math.floor(e.clientY)).padStart(4, '0');
+  document.getElementById('hudCoords').textContent = `X:${x} Y:${y}`;
+});
+
+/* ============================================================
+   8. Three.js 3D 場景 + V22 極光 + V26 光線追蹤
+   ============================================================ */
+let scene, camera, renderer, meshGroup, wireframeMesh, pointsMesh;
+let auroraMesh, auroraMaterial;
+let clock, targetRotationX = 0, targetRotationY = 0;
+let currentRotationX = 0, currentRotationY = 0;
+let threeMouseX = 0, threeMouseY = 0;
+let cameraTargetZ = 8;
+let palette3D = { bg: 0x05050f, color1: 0x8ab4ff, color2: 0xc78aff };
+let gyroEnabled = false;
+let gyroX = 0, gyroY = 0;
+
+let touchZoom = 1;
+let touchRotateX = 0, touchRotateY = 0;
+let lastTouchDist = 0;
+let lastTouchAngle = 0;
+let lastTouchCenter = { x: 0, y: 0 };
+
+function generatePaletteFromSeed() {
+  const hue1 = seededRandom() * 360;
+  const hue2 = (hue1 + 60 + seededRandom() * 120) % 360;
+  const c1 = hslToHex(hue1, 70, 65);
+  const c2 = hslToHex(hue2, 70, 65);
+  const bgHue = (hue1 + 180) % 360;
+  const bg = hslToHex(bgHue, 40, 5);
+  palette3D = { bg, color1: c1, color2: c2 };
+}
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const k = n => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  const toHex = x => Math.round(x * 255).toString(16).padStart(2, '0');
+  return parseInt(`${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`, 16);
+}
+
+/* V22：極光 Shader */
+const auroraVertexShader = `
+  varying vec2 vUv;
+  varying vec3 vPos;
+  void main() {
+    vUv = uv;
+    vPos = position;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const auroraFragmentShader = `
+  uniform float uTime;
+  uniform vec3 uColor1;
+  uniform vec3 uColor2;
+  uniform float uIntensity;
+  varying vec2 vUv;
+  varying vec3 vPos;
+
+  // 簡易雜訊
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+  }
+  float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = hash(i);
+    float b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0));
+    float d = hash(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+  }
+  float fbm(vec2 p) {
+    float v = 0.0;
+    float a = 0.5;
+    for (int i = 0; i < 5; i++) {
+      v += a * noise(p);
+      p *= 2.0;
+      a *= 0.5;
+    }
+    return v;
+  }
+
+  void main() {
+    vec2 uv = vUv;
+    // 極光垂直流動
+    float t = uTime * 0.15;
+    float n = fbm(vec2(uv.x * 3.0, uv.y * 2.0 + t));
+    float n2 = fbm(vec2(uv.x * 5.0 + t * 0.5, uv.y * 3.0 - t));
+    float band = smoothstep(0.3, 0.9, n) * smoothstep(0.2, 0.8, n2);
+
+    // 上緣漸層
+    float fade = smoothstep(0.0, 0.5, uv.y) * smoothstep(1.0, 0.5, uv.y);
+
+    // 顏色混合
+    vec3 col = mix(uColor1, uColor2, n);
+    col += vec3(0.2, 0.8, 0.5) * band * 0.5;
+
+    float alpha = band * fade * uIntensity;
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
+function initThree() {
+  generatePaletteFromSeed();
+  const canvas = document.createElement('canvas');
+  canvas.id = 'three-canvas';
+  document.body.insertBefore(canvas, document.body.firstChild);
+
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(palette3D.bg, 0.02);
+
+  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.z = 8;
+
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.2;
+  clock = new THREE.Clock();
+
+  meshGroup = new THREE.Group();
+  scene.add(meshGroup);
+
+  // V26：光線追蹤感（用高光反射材質）
+  const geo = new THREE.IcosahedronGeometry(2.5, 2);
+  wireframeMesh = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({
+    color: palette3D.color1,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.4,
+    metalness: 0.9,
+    roughness: 0.1,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.1,
+    emissive: palette3D.color1,
+    emissiveIntensity: 0.3
+  }));
+  meshGroup.add(wireframeMesh);
+
+  // 內層：實心 + 高反射
+  const innerGeo = new THREE.IcosahedronGeometry(1.4, 0);
+  const innerMat = new THREE.MeshPhysicalMaterial({
+    color: palette3D.color2,
+    metalness: 1.0,
+    roughness: 0.05,
+    clearcoat: 1.0,
+    transparent: true,
+    opacity: 0.6,
+    emissive: palette3D.color2,
+    emissiveIntensity: 0.5
+  });
+  const innerMesh = new THREE.Mesh(innerGeo, innerMat);
+  meshGroup.add(innerMesh);
+
+  // 粒子雲
+  const pointsGeo = new THREE.BufferGeometry();
+  const count = 2000;
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count * 3; i++) positions[i] = (Math.random() - 0.5) * 40;
+  pointsGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  pointsMesh = new THREE.Points(pointsGeo, new THREE.PointsMaterial({
+    color: palette3D.color1, size: 0.05, transparent: true, opacity: 0.8
+  }));
+  scene.add(pointsMesh);
+
+  // 燈光（讓金屬材質有反射）
+  const light1 = new THREE.PointLight(palette3D.color1, 2, 50);
+  light1.position.set(5, 5, 5);
+  scene.add(light1);
+  const light2 = new THREE.PointLight(palette3D.color2, 2, 50);
+  light2.position.set(-5, -5, 5);
+  scene.add(light2);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+  scene.add(ambientLight);
+
+  // V22：極光
+  const auroraGeo = new THREE.PlaneGeometry(60, 30, 1, 1);
+  auroraMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uColor1: { value: new THREE.Color(palette3D.color1) },
+      uColor2: { value: new THREE.Color(palette3D.color2) },
+      uIntensity: { value: 0.6 }
+    },
+    vertexShader: auroraVertexShader,
+    fragmentShader: auroraFragmentShader,
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+  auroraMesh = new THREE.Mesh(auroraGeo, auroraMaterial);
+  auroraMesh.position.z = -15;
+  auroraMesh.position.y = 5;
+  scene.add(auroraMesh);
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+  window.addEventListener('mousemove', e => {
+    threeMouseX = (e.clientX / window.innerWidth) * 2 - 1;
+    threeMouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+  });
+  initTouchControls(canvas);
+}
+
+function initTouchControls(canvas) {
+  canvas.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const t1 = e.touches[0], t2 = e.touches[1];
+      lastTouchDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      lastTouchAngle = Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
+      lastTouchCenter = {
+        x: (t1.clientX + t2.clientX) / 2,
+        y: (t1.clientY + t2.clientY) / 2
+      };
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', e => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const t1 = e.touches[0], t2 = e.touches[1];
+      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      const angle = Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
+      const centerX = (t1.clientX + t2.clientX) / 2;
+      const centerY = (t1.clientY + t2.clientY) / 2;
+
+      if (lastTouchDist > 0) {
+        const scale = dist / lastTouchDist;
+        touchZoom *= scale;
+        touchZoom = Math.max(0.5, Math.min(3, touchZoom));
+      }
+
+      touchRotateY += (angle - lastTouchAngle) * 0.5;
+      const dx = centerX - lastTouchCenter.x;
+      const dy = centerY - lastTouchCenter.y;
+      touchRotateX += dy * 0.005;
+      touchRotateY += dx * 0.005;
+
+      lastTouchDist = dist;
+      lastTouchAngle = angle;
+      lastTouchCenter = { x: centerX, y: centerY };
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', e => {
+    if (e.touches.length < 2) lastTouchDist = 0;
+  });
+
+  if ('ontouchstart' in window) {
+    setTimeout(() => document.getElementById('touch-hint').classList.add('visible'), 1500);
+  }
+}
+
+function updateThree() {
+  const t = clock.getElapsedTime();
+  const inputX = gyroEnabled ? gyroX : threeMouseX;
+  const inputY = gyroEnabled ? gyroY : threeMouseY;
+  targetRotationY = inputX * 0.8 + touchRotateY;
+  targetRotationX = -inputY * 0.8 + touchRotateX;
+  currentRotationX += (targetRotationX - currentRotationX) * 0.05;
+  currentRotationY += (targetRotationY - currentRotationY) * 0.05;
+  meshGroup.rotation.x = currentRotationX + t * 0.05;
+  meshGroup.rotation.y = currentRotationY + t * 0.1;
+  if (meshGroup.children[1]) {
+    meshGroup.children[1].rotation.x = -t * 0.15;
+    meshGroup.children[1].rotation.y = -t * 0.2;
+  }
+  pointsMesh.rotation.y = t * 0.02;
+  pointsMesh.rotation.x = t * 0.01;
+
+  // 極光動畫
+  if (auroraMaterial) {
+    auroraMaterial.uniforms.uTime.value = t;
+    auroraMaterial.uniforms.uIntensity.value = 0.5 + musicIntensity * 0.5;
+  }
+  if (auroraMesh) {
+    auroraMesh.rotation.z = Math.sin(t * 0.1) * 0.1;
+  }
+
+  const scale = (1 + musicIntensity * 0.2) * touchZoom;
+  meshGroup.scale.set(scale, scale, scale);
+  if (pointsMesh.material) {
+    pointsMesh.material.size = 0.05 + musicIntensity * 0.06;
+    pointsMesh.material.opacity = 0.8 + musicIntensity * 0.2;
+  }
+
+  camera.position.z += (cameraTargetZ - camera.position.z) * 0.05;
+  renderer.render(scene, camera);
+}
+
+function updateThreeTheme() {
+  if (!scene) return;
+  const isLight = currentTheme === 'light';
+  const bg = isLight ? 0xf0f2f8 : palette3D.bg;
+  scene.fog.color.setHex(bg);
+  renderer.setClearColor(bg, 0);
+  if (wireframeMesh) {
+    wireframeMesh.material.color.setHex(isLight ? 0x3060d0 : palette3D.color1);
+    wireframeMesh.material.emissive.setHex(isLight ? 0x3060d0 : palette3D.color1);
+  }
+  if (meshGroup.children[1]) {
+    meshGroup.children[1].material.color.setHex(isLight ? 0x8040c0 : palette3D.color2);
+    meshGroup.children[1].material.emissive.setHex(isLight ? 0x8040c0 : palette3D.color2);
+  }
+  if (pointsMesh) pointsMesh.material.color.setHex(isLight ? 0x3060d0 : palette3D.color1);
+  if (auroraMaterial) {
+    auroraMaterial.uniforms.uColor1.value.setHex(isLight ? 0x3060d0 : palette3D.color1);
+    auroraMaterial.uniforms.uColor2.value.setHex(isLight ? 0x8040c0 : palette3D.color2);
+  }
+}
+
+/* ============================================================
+   9. p5.js 粒子層
+   ============================================================ */
+let particles = [], trail = [];
+const palette = [[120,180,255],[180,120,255],[255,255,255]];
+let isDragging = false, dragStart = null;
+let textPoints = [];
+let titleEl = null;
+let titleParticlesActive = false;
+
+function setup() {
+  const c = createCanvas(windowWidth, windowHeight);
+  c.parent(document.body);
+  c.id('p5-canvas');
+  initTextParticles();
+}
+
+function initTextParticles() {
+  titleEl = document.getElementById('particleTitle');
+  if (!titleEl) return;
+  const rect = titleEl.getBoundingClientRect();
+  const off = document.createElement('canvas');
+  const w = Math.floor(rect.width);
+  const h = Math.floor(rect.height);
+  off.width = w; off.height = h;
+  const ctx = off.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.font = `200 ${Math.min(80, h * 0.8)}px "Courier New", monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('展商城', w / 2, h / 2);
+  const imgData = ctx.getImageData(0, 0, w, h).data;
+  textPoints = [];
+  const step = 3;
+  for (let y = 0; y < h; y += step) {
+    for (let x = 0; x < w; x += step) {
+      const i = (y * w + x) * 4;
+      if (imgData[i + 3] > 128) {
+        textPoints.push({
+          x: rect.left + x, y: rect.top + y,
+          ox: rect.left + x, oy: rect.top + y,
+          vx: 0, vy: 0,
+          size: random(1.5, 3)
+        });
+      }
+    }
+  }
+  titleParticlesActive = true;
+}
+
+function draw() {
+  clear();
+
+  if (titleParticlesActive && titleEl && titleEl.style.opacity !== '0') {
+    textPoints.forEach(p => {
+      const d = dist(mouseX, mouseY, p.x, p.y);
+      if (d < 80) {
+        const force = (80 - d) / 80 * 5;
+        const angle = atan2(p.y - mouseY, p.x - mouseX);
+        p.vx += cos(angle) * force;
+        p.vy += sin(angle) * force;
+      }
+      p.vx += (p.ox - p.x) * 0.01;
+      p.vy += (p.oy - p.y) * 0.01;
+      p.vx *= 0.9; p.vy *= 0.9;
+      p.x += p.vx; p.y += p.vy;
+      noStroke();
+      fill(138, 180, 255, 200);
+      circle(p.x, p.y, p.size);
+    });
+  }
+
+  if (isDragging && dragStart) {
+    stroke(255, 255, 255, 30); strokeWeight(1); noFill();
+    circle(dragStart.x, dragStart.y, dist(dragStart.x, dragStart.y, mouseX, mouseY) * 2);
+    noStroke();
+  }
+
+  trail.push({ x: mouseX, y: mouseY, life: 255 });
+  trail = trail.filter(p => p.life > 0);
+  trail.forEach(p => {
+    const c = palette[0];
+    noStroke();
+    fill(c[0], c[1], c[2], p.life * 0.12);
+    circle(p.x, p.y, 70);
+    p.life -= 10;
+  });
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    if (isDragging && dragStart) {
+      const d = dist(p.x, p.y, mouseX, mouseY);
+      if (d < 250 && d > 0) {
+        const force = (250 - d) / 250 * 0.6;
+        p.vx += (mouseX - p.x) / d * force;
+        p.vy += (mouseY - p.y) / d * force;
+      }
+    }
+    p.x += p.vx; p.y += p.vy;
+    p.vy += 0.03; p.vx *= 0.99; p.vy *= 0.99;
+    p.life -= 1.5;
+    const c = palette[p.colorIdx];
+    noStroke();
+    fill(c[0], c[1], c[2], p.life);
+    circle(p.x, p.y, p.size);
+    if (p.life <= 0 || p.y > height + 50) particles.splice(i, 1);
+  }
+
+  if (frameCount % 2 === 0 && !isTransitioning) {
+    particles.push({
+      x: mouseX + random(-5, 5), y: mouseY + random(-5, 5),
+      vx: random(-1, 1), vy: random(-1, 1),
+      size: random(3, 8), life: 255,
+      colorIdx: floor(random(palette.length))
+    });
+  }
+}
+
+function explode(x, y, count) {
+  for (let i = 0; i < count; i++) {
+    const angle = random(TWO_PI);
+    const speed = random(2, 12);
+    particles.push({
+      x, y,
+      vx: cos(angle) * speed, vy: sin(angle) * speed,
+      size: random(3, 12), life: 255,
+      colorIdx: floor(random(palette.length))
+    });
+  }
+}
+
+function mousePressed() {
+  if (isTransitioning) return;
+  isDragging = true;
+  dragStart = { x: mouseX, y: mouseY };
+  explode(mouseX, mouseY, 60);
+  playSpatialSound(mouseX, mouseY, 440 + random(-100, 100), 0.6);
+}
+function mouseReleased() { isDragging = false; dragStart = null; }
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  if (titleParticlesActive) setTimeout(initTextParticles, 100);
+  const gc = document.getElementById('gesture-canvas');
+  gc.width = windowWidth;
+  gc.height = windowHeight;
+}
+function touchStarted() { mousePressed(); return false; }
+function touchEnded() { mouseReleased(); return false; }
+
+function updateVisualizer() {
+  if (!analyser) return;
+  analyser.getByteFrequencyData(dataArray);
+  for (let i = 0; i < vizBars.length; i++) {
+    const v = dataArray[i] / 255;
+    vizBars[i].style.height = Math.max(2, v * 40) + 'px';
+  }
+}
+
+/* ============================================================
+   10. 手勢控制
+   ============================================================ */
+const gyroBtn = document.getElementById('gyro-toggle');
+function enableGyro() {
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission().then(state => {
+      if (state === 'granted') {
+        window.addEventListener('deviceorientation', handleGyro);
+        gyroEnabled = true;
+        gyroBtn.classList.add('active');
+      }
+    }).catch(console.error);
+  } else {
+    window.addEventListener('deviceorientation', handleGyro);
+    gyroEnabled = true;
+    gyroBtn.classList.add('active');
+  }
+}
+function handleGyro(e) {
+  gyroX = Math.max(-1, Math.min(1, (e.gamma || 0) / 45));
+  gyroY = Math.max(-1, Math.min(1, (e.beta || 0) / 45));
+}
+gyroBtn.addEventListener('click', () => {
+  if (gyroEnabled) {
+    window.removeEventListener('deviceorientation', handleGyro);
+    gyroEnabled = false;
+    gyroBtn.classList.remove('active');
+  } else enableGyro();
+});
+
+/* ============================================================
+   11. 導航邏輯
+   ============================================================ */
+const loader = document.getElementById('loader');
+const enterBtn = document.getElementById('enter-btn');
+const titleBar = document.getElementById('titleBar');
+const navGrid = document.getElementById('navGrid');
+const footerHint = document.getElementById('footerHint');
+const soundToggle = document.getElementById('sound-toggle');
+const overlay = document.getElementById('transition-overlay');
+const overlayTarget = document.getElementById('overlayTarget');
+const overlayUrl = document.getElementById('overlayUrl');
+let isTransitioning = false;
+
+setTimeout(() => { loader.classList.add('hidden'); }, 2200);
+
+enterBtn.addEventListener('click', () => {
+  if (!audioCtx) initAudio();
+  playEnterSound();
+  speak('歡迎來到展商城');
+  enterBtn.classList.add('hidden');
+  titleBar.style.opacity = '0';
+  titleBar.style.transform = 'translate(-50%, -80%) scale(0.9)';
+  cameraTargetZ = 12;
+  setTimeout(() => {
+    navGrid.classList.add('visible');
+    footerHint.classList.add('visible');
+    titleParticlesActive = false;
+  }, 400);
+});
+
+document.querySelectorAll('.card-wrap').forEach(wrap => {
+  let isFlipped = false;
+  let flipTimer = null;
+  wrap.addEventListener('mouseenter', () => {
+    if (isTransitioning) return;
+    playHoverSound();
+    playFlipSound();
+    isFlipped = true;
+    wrap.classList.add('flipped');
+    if (flipTimer) clearTimeout(flipTimer);
+  });
+  wrap.addEventListener('mouseleave', () => {
+    if (isTransitioning) return;
+    if (flipTimer) clearTimeout(flipTimer);
+    flipTimer = setTimeout(() => {
+      isFlipped = false;
+      wrap.classList.remove('flipped');
+    }, 500);
+  });
+  wrap.addEventListener('mousemove', e => {
+    const rect = wrap.getBoundingClientRect();
+    const mx = ((e.clientX - rect.left) / rect.width) * 100;
+    const my = ((e.clientY - rect.top) / rect.height) * 100;
+    wrap.querySelectorAll('.nav-card').forEach(c => {
+      c.style.setProperty('--mx', mx + '%');
+      c.style.setProperty('--my', my + '%');
+    });
+    if (!isFlipped) {
+      const rx = ((e.clientY - rect.top) / rect.height - 0.5) * 10;
+      const ry = ((e.clientX - rect.left) / rect.width - 0.5) * -10;
+      wrap.style.transform = `rotateY(${ry}deg) rotateX(${rx}deg)`;
+    }
+  });
+  wrap.addEventListener('mouseleave', () => { wrap.style.transform = ''; });
+  wrap.addEventListener('click', e => {
+    e.preventDefault();
+    if (isTransitioning) return;
+    playTransitionSequence(wrap, wrap.dataset.href, wrap.dataset.title);
+  });
+});
+
+function playTransitionSequence(wrap, href, title) {
+  isTransitioning = true;
+  wrap.classList.add('focused');
+  targetIntensity = 1;
+  playTransitionSound();
+  speak('正在前往' + title);
+
+  const rect = wrap.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  for (let i = 0; i < 5; i++) {
+    setTimeout(() => explode(cx + random(-100, 100), cy + random(-60, 60), 20), i * 80);
+  }
+
+  overlayTarget.textContent = title;
+  overlayUrl.textContent = href;
+  setTimeout(() => overlay.classList.add('active'), 350);
+
+  setTimeout(() => {
+    playOpenSound();
+    window.open(href, '_blank', 'noopener,noreferrer');
+  }, 1800);
+
+  setTimeout(() => {
+    overlay.classList.remove('active');
+    wrap.classList.remove('focused');
+    targetIntensity = 0;
+    isTransitioning = false;
+  }, 2800);
+}
+
+soundToggle.addEventListener('click', () => {
+  if (!audioCtx) {
+    initAudio();
+    soundToggle.textContent = '🔊';
+  } else if (isAudioOn) {
+    masterGain.gain.value = 0;
+    isAudioOn = false;
+    soundToggle.textContent = '🔇';
+  } else {
+    masterGain.gain.value = volumeLevel;
+    isAudioOn = true;
+    soundToggle.textContent = '🔊';
+  }
+});
+
+function updateIntensity() {
+  musicIntensity += (targetIntensity - musicIntensity) * 0.05;
+  if (musicGain && isAudioOn) {
+    musicGain.gain.value = 0.35 + musicIntensity * 0.25;
+  }
+  if (wetGain && isAudioOn) {
+    wetGain.gain.value = 0.35 + musicIntensity * 0.3;
+  }
+}
+
+/* ============================================================
+   12. 啟動
+   ============================================================ */
+window.addEventListener('load', () => {
+  initThree();
+  animate();
+  setTimeout(initTextParticles, 500);
+});
+
+function animate() {
+  requestAnimationFrame(animate);
+  updateThree();
+  updateVisualizer();
+  updateIntensity();
+}
+</script>
+</body>
+</html>

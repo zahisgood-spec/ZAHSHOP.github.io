@@ -2,11 +2,15 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>展商城 // 分頁導航</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#05050f">
+<meta name="mobile-web-app-capable" content="yes">
+<title>展商城 // 分頁總覽</title>
 <link rel="icon" type="image/png" href="logo.png">
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
   :root {
     --bg: #05050f;
@@ -16,9 +20,13 @@
     --text-faint: rgba(255,255,255,0.3);
     --accent: #8ab4ff;
     --accent2: #c78aff;
-    --card-bg: rgba(10,10,25,0.4);
-    --card-border: rgba(138,180,255,0.2);
+    --card-bg: rgba(10,10,25,0.5);
+    --card-border: rgba(138,180,255,0.25);
     --hud: rgba(138,180,255,0.6);
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
   }
   [data-theme="light"] {
     --bg: #f0f2f8;
@@ -28,56 +36,67 @@
     --text-faint: rgba(10,10,26,0.4);
     --accent: #3060d0;
     --accent2: #8040c0;
-    --card-bg: rgba(255,255,255,0.5);
-    --card-border: rgba(48,96,208,0.25);
+    --card-bg: rgba(255,255,255,0.6);
+    --card-border: rgba(48,96,208,0.3);
     --hud: rgba(48,96,208,0.7);
   }
 
   html, body {
     background: var(--bg);
     color: var(--text);
-    font-family: 'Courier New', 'Noto Sans TC', monospace;
+    font-family: -apple-system, 'Courier New', 'Noto Sans TC', monospace;
     overflow: hidden;
-    cursor: none;
-    height: 100vh;
-    perspective: 1500px;
+    height: 100dvh;
+    width: 100vw;
     transition: background 0.8s, color 0.8s;
     touch-action: none;
     -webkit-user-select: none;
     user-select: none;
+    overscroll-behavior: none;
+    position: fixed;
+    top: 0; left: 0;
   }
   canvas { display: block; }
 
-  /* ============================================================
-     V20：背景影片
-     ============================================================ */
+  /* 桌機顯示自訂游標，手機隱藏 */
+  .cursor, .cursor-dot { display: block; }
+  @media (hover: none) and (pointer: coarse) {
+    .cursor, .cursor-dot { display: none; }
+    body { cursor: auto; }
+  }
+
   #bg-video {
     position: fixed;
     top: 0; left: 0;
-    width: 100vw; height: 100vh;
+    width: 100vw; height: 100dvh;
     object-fit: cover;
     z-index: 0;
-    opacity: 0.25;
+    opacity: 0.2;
     filter: blur(2px) saturate(1.2);
     transition: opacity 0.8s;
     pointer-events: none;
   }
   [data-theme="light"] #bg-video {
-    opacity: 0.15;
+    opacity: 0.12;
     filter: blur(3px) saturate(0.8) brightness(1.2);
   }
 
   #three-canvas {
     position: fixed; top: 0; left: 0;
-    width: 100vw; height: 100vh;
+    width: 100vw; height: 100dvh;
     z-index: 1;
-    transition: filter 0.6s;
     touch-action: none;
   }
   #p5-canvas {
     position: fixed; top: 0; left: 0;
-    width: 100vw; height: 100vh;
+    width: 100vw; height: 100dvh;
     z-index: 2;
+    pointer-events: none;
+  }
+  #gesture-canvas {
+    position: fixed; top: 0; left: 0;
+    width: 100vw; height: 100dvh;
+    z-index: 9998;
     pointer-events: none;
   }
 
@@ -100,64 +119,67 @@
     pointer-events: none;
     z-index: 9999;
     transform: translate(-50%, -50%);
-    transition: background 0.6s;
   }
   .cursor.active {
     width: 60px; height: 60px;
     background: rgba(255,255,255,0.15);
   }
 
+  /* HUD - 手機上簡化 */
   .hud {
     position: fixed;
-    font-size: 11px;
-    letter-spacing: 2px;
+    font-size: 10px;
+    letter-spacing: 1.5px;
     color: var(--hud);
     z-index: 10;
     pointer-events: none;
     text-transform: uppercase;
     transition: color 0.6s;
   }
-  .hud-tl { top: 24px; left: 24px; }
-  .hud-tr { top: 24px; right: 24px; text-align: right; }
-  .hud-bl { bottom: 24px; left: 24px; }
-  .hud-br { bottom: 24px; right: 24px; text-align: right; }
-  .hud .blink { animation: blink 1s infinite; }
-  @keyframes blink {
-    0%, 50% { opacity: 1; }
-    51%, 100% { opacity: 0; }
-  }
+  .hud-tl { top: calc(16px + var(--safe-top)); left: calc(16px + var(--safe-left)); }
+  .hud-tr { top: calc(16px + var(--safe-top)); right: calc(16px + var(--safe-right)); text-align: right; }
+  .hud-bl { bottom: calc(16px + var(--safe-bottom)); left: calc(16px + var(--safe-left)); }
+  .hud-br { bottom: calc(16px + var(--safe-bottom)); right: calc(16px + var(--safe-right)); text-align: right; }
   .hud .clock-time {
-    font-size: 13px;
-    letter-spacing: 3px;
+    font-size: 12px;
+    letter-spacing: 2px;
     color: var(--text);
+  }
+
+  /* 手機隱藏部分 HUD */
+  @media (max-width: 700px) {
+    .hud-tl { font-size: 9px; }
+    .hud-bl { font-size: 9px; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hud-br { font-size: 9px; }
   }
 
   #audio-viz {
     position: fixed;
-    bottom: 80px;
+    bottom: calc(80px + var(--safe-bottom));
     left: 50%;
     transform: translateX(-50%);
-    width: 240px;
-    height: 40px;
+    width: 200px;
+    height: 30px;
     z-index: 8;
     display: flex;
     align-items: flex-end;
     justify-content: center;
-    gap: 3px;
+    gap: 2px;
     opacity: 0;
     transition: opacity 0.6s;
     pointer-events: none;
   }
-  #audio-viz.visible { opacity: 0.8; }
+  #audio-viz.visible { opacity: 0.7; }
   #audio-viz .bar {
-    width: 4px;
+    width: 3px;
     height: 2px;
     background: linear-gradient(to top, var(--accent), var(--accent2));
     border-radius: 2px;
     transition: height 0.06s ease;
-    box-shadow: 0 0 8px var(--accent);
+    box-shadow: 0 0 6px var(--accent);
   }
 
+  /* 主標題 */
   .title-bar {
     position: fixed;
     top: 50%; left: 50%;
@@ -166,11 +188,13 @@
     text-align: center;
     pointer-events: none;
     transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    padding: 0 20px;
+    width: 100%;
   }
   .title-bar h1 {
-    font-size: clamp(2rem, 6vw, 4.5rem);
+    font-size: clamp(1.8rem, 10vw, 4.5rem);
     font-weight: 200;
-    letter-spacing: 0.3em;
+    letter-spacing: 0.2em;
     background: linear-gradient(120deg, var(--text), var(--accent), var(--accent2), var(--text));
     background-size: 300% 300%;
     -webkit-background-clip: text;
@@ -183,31 +207,32 @@
     50% { background-position: 100% 50%; }
   }
   .title-bar .sub {
-    margin-top: 16px;
-    font-size: 11px;
-    letter-spacing: 6px;
+    margin-top: 12px;
+    font-size: 9px;
+    letter-spacing: 4px;
     color: var(--text-faint);
-    transition: color 0.6s;
   }
   .title-bar .cursor-blink {
     display: inline-block;
-    width: 8px;
-    height: 14px;
+    width: 6px;
+    height: 12px;
     background: var(--accent);
     vertical-align: middle;
     margin-left: 4px;
     animation: blink 0.8s infinite;
   }
 
+  /* 卡片網格 - 手機直向單欄、橫向雙欄 */
   .nav-grid {
     position: fixed;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%) scale(0.9);
     z-index: 4;
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 24px;
-    width: min(90vw, 760px);
+    grid-template-columns: 1fr;
+    gap: 14px;
+    width: min(92vw, 380px);
+    max-height: 70dvh;
     opacity: 0;
     pointer-events: none;
     transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
@@ -219,10 +244,32 @@
     pointer-events: auto;
   }
 
+  /* 平板 / 橫向手機：雙欄 */
+  @media (min-width: 600px) and (min-height: 500px) {
+    .nav-grid {
+      grid-template-columns: repeat(2, 1fr);
+      width: min(88vw, 700px);
+    }
+  }
+
+  /* 手機橫向：縮小高度 */
+  @media (max-height: 500px) and (orientation: landscape) {
+    .nav-grid {
+      grid-template-columns: repeat(2, 1fr);
+      width: min(90vw, 640px);
+      gap: 12px;
+    }
+    .card-wrap { height: 200px; }
+    .nav-card { padding: 18px 16px; }
+    .nav-card .card-title { font-size: 1rem; }
+    .nav-card .card-desc { font-size: 10px; }
+    .title-bar h1 { font-size: 2rem; }
+  }
+
   .card-wrap {
     position: relative;
     width: 100%;
-    height: 300px;
+    height: 220px;
     transform-style: preserve-3d;
     transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
     will-change: transform;
@@ -231,15 +278,19 @@
     transform: rotateY(180deg);
   }
 
-  /* V26：光線追蹤模擬（用多層光暈 + 反射） */
+  /* 手機：卡片較矮 */
+  @media (max-width: 700px) {
+    .card-wrap { height: 180px; }
+  }
+
   .nav-card {
     position: absolute;
     top: 0; left: 0;
     width: 100%;
     height: 100%;
-    padding: 32px 28px;
+    padding: 22px 20px;
     border-radius: 16px;
-    cursor: none;
+    cursor: pointer;
     transition: border-color 0.4s, box-shadow 0.4s, background 0.6s;
     overflow: hidden;
     text-decoration: none;
@@ -250,35 +301,27 @@
     flex-direction: column;
     justify-content: center;
     background: var(--card-bg);
-    backdrop-filter: blur(30px) saturate(180%);
-    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
     border: 1px solid var(--card-border);
     box-shadow:
       inset 0 1px 0 rgba(255,255,255,0.1),
-      inset 0 -1px 0 rgba(138,180,255,0.1),
-      0 20px 60px rgba(0,0,0,0.3);
+      0 15px 40px rgba(0,0,0,0.3);
+    -webkit-tap-highlight-color: transparent;
   }
-  /* 反射層 */
   .nav-card .reflect-layer {
     position: absolute;
     top: 0; left: 0;
     width: 100%; height: 100%;
     border-radius: 16px;
-    background: linear-gradient(
-      135deg,
-      rgba(255,255,255,0.15) 0%,
-      transparent 30%,
-      transparent 70%,
-      rgba(138,180,255,0.1) 100%
-    );
+    background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 30%, transparent 70%, rgba(138,180,255,0.1) 100%);
     pointer-events: none;
     z-index: 3;
     opacity: 0.6;
   }
-  /* 光線追蹤高光（跟隨滑鼠） */
   .nav-card .highlight {
     position: absolute;
-    width: 300px; height: 300px;
+    width: 200px; height: 200px;
     border-radius: 50%;
     background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
     pointer-events: none;
@@ -289,6 +332,10 @@
     mix-blend-mode: overlay;
   }
   .card-wrap:hover .nav-card .highlight {
+    opacity: 1;
+  }
+  /* 觸控時也有高光 */
+  .card-wrap.touched .nav-card .highlight {
     opacity: 1;
   }
 
@@ -333,14 +380,16 @@
     pointer-events: none;
     z-index: 1;
   }
-  .card-wrap:hover .nav-card::before { opacity: 1; }
-  .card-wrap:hover .nav-card {
+  .card-wrap:hover .nav-card::before,
+  .card-wrap.touched .nav-card::before { opacity: 1; }
+
+  .card-wrap:hover .nav-card,
+  .card-wrap.touched .nav-card {
     border-color: var(--accent);
     box-shadow:
       inset 0 1px 0 rgba(255,255,255,0.2),
-      inset 0 -1px 0 var(--accent),
-      0 30px 80px rgba(138,180,255,0.2),
-      0 0 60px rgba(138,180,255,0.15);
+      0 20px 60px rgba(138,180,255,0.25),
+      0 0 40px rgba(138,180,255,0.15);
   }
 
   .card-front { transform: rotateY(0deg); }
@@ -351,10 +400,10 @@
     justify-content: center;
   }
   .card-back .back-icon {
-    font-size: 48px;
-    margin-bottom: 20px;
+    font-size: 36px;
+    margin-bottom: 14px;
     color: var(--accent);
-    text-shadow: 0 0 40px var(--accent);
+    text-shadow: 0 0 30px var(--accent);
     animation: iconPulse 1.5s ease infinite;
   }
   @keyframes iconPulse {
@@ -362,53 +411,53 @@
     50% { transform: scale(1.15); opacity: 0.8; }
   }
   .card-back .back-label {
-    font-size: 10px;
-    letter-spacing: 4px;
+    font-size: 9px;
+    letter-spacing: 3px;
     color: var(--accent);
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     text-transform: uppercase;
   }
   .card-back .back-title {
-    font-size: 1.2rem;
+    font-size: 1.05rem;
     font-weight: 300;
-    letter-spacing: 0.2em;
+    letter-spacing: 0.15em;
     color: var(--text);
-    margin-bottom: 16px;
+    margin-bottom: 10px;
   }
   .card-back .back-hint {
-    font-size: 10px;
-    letter-spacing: 2px;
+    font-size: 9px;
+    letter-spacing: 1.5px;
     color: var(--text-faint);
   }
 
   .nav-card .card-num {
-    font-size: 10px;
-    letter-spacing: 3px;
+    font-size: 9px;
+    letter-spacing: 2px;
     color: var(--accent);
-    margin-bottom: 18px;
+    margin-bottom: 10px;
     position: relative;
     z-index: 2;
   }
   .nav-card .card-title {
-    font-size: clamp(1.1rem, 2.2vw, 1.5rem);
+    font-size: clamp(1rem, 4vw, 1.3rem);
     font-weight: 300;
-    letter-spacing: 0.15em;
-    margin-bottom: 12px;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
     color: var(--text);
     position: relative;
     z-index: 2;
   }
   .nav-card .card-desc {
-    font-size: 11px;
-    letter-spacing: 1px;
-    line-height: 1.8;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    line-height: 1.6;
     color: var(--text-dim);
     position: relative;
     z-index: 2;
   }
   .nav-card .card-url {
-    margin-top: 16px;
-    font-size: 9px;
+    margin-top: 8px;
+    font-size: 8px;
     letter-spacing: 1px;
     color: var(--accent);
     opacity: 0.6;
@@ -418,83 +467,136 @@
   }
   .nav-card .card-arrow {
     position: absolute;
-    bottom: 24px;
-    right: 28px;
-    font-size: 18px;
+    bottom: 16px;
+    right: 20px;
+    font-size: 16px;
     color: var(--accent);
     opacity: 0.6;
     transition: transform 0.4s, opacity 0.4s;
     z-index: 2;
   }
   .card-wrap:hover .card-arrow {
-    transform: translateX(8px);
+    transform: translateX(6px);
     opacity: 1;
   }
 
-  /* AI 推薦高亮 */
+  /* AI 推薦 */
   .card-wrap.recommended .nav-card {
     border-color: #ffd700;
     box-shadow:
-      0 0 40px rgba(255,215,0,0.5),
-      0 0 80px rgba(255,215,0,0.3),
-      inset 0 0 30px rgba(255,215,0,0.1);
+      0 0 30px rgba(255,215,0,0.5),
+      0 0 60px rgba(255,215,0,0.3);
   }
   .card-wrap.recommended::before {
     content: '✦ AI 推薦';
     position: absolute;
-    top: -12px;
+    top: -10px;
     left: 50%;
     transform: translateX(-50%);
-    padding: 4px 14px;
+    padding: 3px 12px;
     background: linear-gradient(90deg, #ffd700, #ffaa00);
     color: #000;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: bold;
-    letter-spacing: 2px;
+    letter-spacing: 1.5px;
     border-radius: 100px;
     z-index: 10;
-    box-shadow: 0 0 20px rgba(255,215,0,0.8);
-    animation: recBadge 1.5s ease infinite;
-  }
-  @keyframes recBadge {
-    0%, 100% { transform: translateX(-50%) scale(1); }
-    50% { transform: translateX(-50%) scale(1.08); }
+    box-shadow: 0 0 15px rgba(255,215,0,0.8);
+    white-space: nowrap;
   }
 
-  #ai-toggle {
+  /* ============================================================
+     手機控制列（底部）
+     ============================================================ */
+  #mobile-controls {
     position: fixed;
-    bottom: 24px; right: 192px;
+    bottom: calc(12px + var(--safe-bottom));
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 100;
+    display: none;
+    gap: 8px;
+    padding: 6px;
+    background: var(--card-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--card-border);
+    border-radius: 100px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+  @media (hover: none) and (pointer: coarse) {
+    #mobile-controls { display: flex; }
+  }
+  #mobile-controls .m-btn {
+    width: 46px; height: 46px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+  }
+  #mobile-controls .m-btn:active {
+    background: rgba(138,180,255,0.2);
+    transform: scale(0.92);
+  }
+  #mobile-controls .m-btn.active {
+    background: rgba(138,180,255,0.25);
+    color: var(--accent);
+    box-shadow: 0 0 15px rgba(138,180,255,0.4);
+  }
+  #mobile-controls .m-btn.recording {
+    background: rgba(255,68,68,0.25);
+    color: #ff4444;
+    animation: recPulse 1s infinite;
+  }
+  #mobile-controls .m-btn.playing {
+    background: rgba(74,222,128,0.25);
+    color: #4ade80;
+  }
+
+  /* 桌機控制按鈕（右下角） */
+  .ctrl-btn {
+    position: fixed;
     width: 44px; height: 44px;
     border-radius: 50%;
     border: 1px solid var(--card-border);
     background: var(--card-bg);
     backdrop-filter: blur(10px);
     color: var(--text);
-    font-size: 18px;
+    font-size: 16px;
     cursor: none;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.3s;
+    z-index: 100;
   }
-  #ai-toggle:hover {
+  .ctrl-btn:hover {
     border-color: var(--accent);
     background: rgba(138,180,255,0.1);
     box-shadow: 0 0 30px rgba(138,180,255,0.3);
   }
-  #ai-toggle.active {
-    border-color: var(--accent2);
-    background: rgba(199,138,255,0.15);
-  }
-  #ai-toggle.speaking {
-    animation: aiSpeak 0.8s ease infinite;
-  }
-  @keyframes aiSpeak {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(138,180,255,0.6); }
-    50% { box-shadow: 0 0 0 15px rgba(138,180,255,0); }
+  #sound-toggle { bottom: 24px; right: 24px; }
+  #theme-toggle { bottom: 24px; right: 80px; }
+  #gyro-toggle { bottom: 24px; right: 136px; }
+  #ai-toggle { bottom: 24px; right: 192px; }
+  #record-toggle { bottom: 24px; right: 248px; }
+
+  /* 手機隱藏桌機按鈕 */
+  @media (hover: none) and (pointer: coarse) {
+    .ctrl-btn { display: none; }
   }
 
+  /* ============================================================
+     AI 面板（手機全螢幕）
+     ============================================================ */
   #ai-panel {
     position: fixed;
     bottom: 80px;
@@ -504,6 +606,7 @@
     z-index: 999;
     background: var(--card-bg);
     backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
     border: 1px solid var(--card-border);
     border-radius: 16px;
     display: flex;
@@ -520,12 +623,28 @@
     visibility: visible;
     transform: translateY(0) scale(1);
   }
+  /* 手機全螢幕 */
+  @media (max-width: 700px) {
+    #ai-panel {
+      bottom: 0;
+      right: 0;
+      left: 0;
+      top: 0;
+      width: 100vw;
+      max-height: 100dvh;
+      height: 100dvh;
+      border-radius: 0;
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bottom);
+    }
+  }
   #ai-panel .ai-header {
     padding: 14px 18px;
     border-bottom: 1px solid var(--card-border);
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-shrink: 0;
   }
   #ai-panel .ai-header .ai-title {
     font-size: 11px;
@@ -553,27 +672,39 @@
     animation: blink 1.5s infinite;
   }
   #voice-toggle {
-    width: 26px; height: 26px;
+    width: 30px; height: 30px;
     border-radius: 50%;
     border: 1px solid var(--card-border);
     background: transparent;
     color: var(--text-faint);
-    font-size: 12px;
-    cursor: none;
+    font-size: 13px;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.3s;
-  }
-  #voice-toggle:hover {
-    border-color: var(--accent);
-    color: var(--accent);
+    -webkit-tap-highlight-color: transparent;
   }
   #voice-toggle.active {
     border-color: var(--accent);
     color: var(--accent);
     background: rgba(138,180,255,0.15);
-    box-shadow: 0 0 15px rgba(138,180,255,0.4);
+  }
+  #ai-close {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    border: 1px solid var(--card-border);
+    background: transparent;
+    color: var(--text);
+    font-size: 16px;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+  @media (max-width: 700px) {
+    #ai-close { display: flex; }
   }
   #ai-panel .ai-messages {
     flex: 1;
@@ -582,8 +713,8 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    min-height: 200px;
-    max-height: 320px;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
   }
   #ai-panel .ai-messages::-webkit-scrollbar {
     width: 4px;
@@ -595,7 +726,7 @@
   .ai-msg {
     padding: 10px 14px;
     border-radius: 12px;
-    font-size: 12px;
+    font-size: 13px;
     line-height: 1.6;
     max-width: 85%;
     word-wrap: break-word;
@@ -625,21 +756,23 @@
     position: absolute;
     bottom: -8px;
     right: -8px;
-    width: 20px; height: 20px;
+    width: 22px; height: 22px;
     border-radius: 50%;
     background: var(--accent);
     color: #fff;
     border: none;
-    font-size: 10px;
-    cursor: none;
+    font-size: 11px;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    opacity: 0;
+    opacity: 0.7;
     transition: opacity 0.3s;
+    -webkit-tap-highlight-color: transparent;
   }
-  .ai-msg.bot:hover .speak-btn {
+  .ai-msg.bot .speak-btn:active {
     opacity: 1;
+    transform: scale(0.9);
   }
   .ai-msg.typing {
     display: flex;
@@ -663,19 +796,20 @@
     border-top: 1px solid var(--card-border);
     display: flex;
     gap: 8px;
+    flex-shrink: 0;
   }
   #ai-input {
     flex: 1;
-    padding: 10px 14px;
+    padding: 12px 16px;
     background: rgba(0,0,0,0.2);
     border: 1px solid var(--card-border);
     border-radius: 100px;
     color: var(--text);
     font-family: inherit;
-    font-size: 12px;
+    font-size: 14px;
     outline: none;
-    cursor: none;
     transition: border-color 0.3s;
+    -webkit-appearance: none;
   }
   #ai-input:focus {
     border-color: var(--accent);
@@ -684,94 +818,32 @@
     color: var(--text-faint);
   }
   #ai-send {
-    width: 38px; height: 38px;
+    width: 44px; height: 44px;
     border-radius: 50%;
     border: 1px solid var(--card-border);
     background: rgba(138,180,255,0.15);
     color: var(--accent);
-    font-size: 14px;
-    cursor: none;
+    font-size: 16px;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.3s;
     flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
   }
-  #ai-send:hover {
-    background: rgba(138,180,255,0.3);
-    border-color: var(--accent);
+  #ai-send:active {
+    transform: scale(0.9);
   }
   #ai-send:disabled {
     opacity: 0.3;
-    cursor: none;
   }
 
-  #record-toggle {
-    position: fixed;
-    bottom: 24px; right: 248px;
-    z-index: 100;
-    width: 44px; height: 44px;
-    border-radius: 50%;
-    border: 1px solid var(--card-border);
-    background: var(--card-bg);
-    backdrop-filter: blur(10px);
-    color: var(--text);
-    font-size: 16px;
-    cursor: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s;
-  }
-  #record-toggle:hover {
-    border-color: var(--accent);
-    background: rgba(138,180,255,0.1);
-  }
-  #record-toggle.recording {
-    border-color: #ff4444;
-    background: rgba(255,68,68,0.2);
-    color: #ff4444;
-    animation: recPulse 1s infinite;
-  }
-  #record-toggle.playing {
-    border-color: #4ade80;
-    background: rgba(74,222,128,0.2);
-    color: #4ade80;
-  }
-  @keyframes recPulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(255,68,68,0.5); }
-    50% { box-shadow: 0 0 0 10px rgba(255,68,68,0); }
-  }
-
-  .ctrl-btn {
-    position: fixed;
-    width: 44px; height: 44px;
-    border-radius: 50%;
-    border: 1px solid var(--card-border);
-    background: var(--card-bg);
-    backdrop-filter: blur(10px);
-    color: var(--text);
-    font-size: 16px;
-    cursor: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s;
-    z-index: 100;
-  }
-  .ctrl-btn:hover {
-    border-color: var(--accent);
-    background: rgba(138,180,255,0.1);
-    box-shadow: 0 0 30px rgba(138,180,255,0.3);
-  }
-  #sound-toggle { bottom: 24px; right: 24px; }
-  #theme-toggle { bottom: 24px; right: 80px; }
-  #gyro-toggle { bottom: 24px; right: 136px; }
-
+  /* 載入畫面 */
   #loader {
     position: fixed;
     top: 0; left: 0;
-    width: 100vw; height: 100vh;
+    width: 100vw; height: 100dvh;
     background: var(--bg);
     z-index: 100000;
     display: flex;
@@ -779,6 +851,7 @@
     align-items: center;
     justify-content: center;
     transition: opacity 0.8s, visibility 0.8s, background 0.6s;
+    padding: 20px;
   }
   #loader.hidden {
     opacity: 0;
@@ -792,7 +865,7 @@
     text-transform: uppercase;
   }
   #loader .load-bar {
-    width: 240px;
+    width: min(240px, 70vw);
     height: 1px;
     background: rgba(255,255,255,0.1);
     position: relative;
@@ -828,25 +901,27 @@
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
     z-index: 6;
-    margin-top: 120px;
-    padding: 14px 40px;
+    margin-top: 100px;
+    padding: 16px 44px;
     border: 1px solid var(--card-border);
     border-radius: 100px;
     background: var(--card-bg);
     backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     color: var(--text);
     font-family: inherit;
-    font-size: 12px;
-    letter-spacing: 5px;
+    font-size: 13px;
+    letter-spacing: 4px;
     text-transform: uppercase;
-    cursor: none;
+    cursor: pointer;
     transition: all 0.4s;
+    -webkit-tap-highlight-color: transparent;
+    white-space: nowrap;
   }
-  #enter-btn:hover {
+  #enter-btn:active {
+    transform: translate(-50%, -50%) scale(0.95);
     border-color: var(--accent);
-    background: rgba(138,180,255,0.1);
-    letter-spacing: 7px;
-    box-shadow: 0 0 40px rgba(138,180,255,0.3);
+    background: rgba(138,180,255,0.15);
   }
   #enter-btn.hidden {
     opacity: 0;
@@ -856,24 +931,30 @@
 
   .footer-hint {
     position: fixed;
-    bottom: 24px;
+    bottom: calc(75px + var(--safe-bottom));
     left: 50%;
     transform: translateX(-50%);
     z-index: 5;
-    font-size: 10px;
-    letter-spacing: 4px;
+    font-size: 9px;
+    letter-spacing: 3px;
     color: var(--text-faint);
     text-transform: uppercase;
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.8s;
+    white-space: nowrap;
+    text-align: center;
   }
   .footer-hint.visible { opacity: 1; }
+  @media (max-width: 700px) {
+    .footer-hint { font-size: 8px; letter-spacing: 2px; }
+  }
 
+  /* 跳轉動畫 */
   #transition-overlay {
     position: fixed;
     top: 0; left: 0;
-    width: 100vw; height: 100vh;
+    width: 100vw; height: 100dvh;
     z-index: 99998;
     pointer-events: none;
     opacity: 0;
@@ -927,41 +1008,36 @@
     text-align: center;
     opacity: 0;
     transition: opacity 0.4s;
+    width: 90%;
   }
   #transition-overlay.active .overlay-text {
     opacity: 1;
     transition-delay: 0.4s;
   }
   #transition-overlay .overlay-text .label {
-    font-size: 11px;
-    letter-spacing: 8px;
+    font-size: 10px;
+    letter-spacing: 6px;
     color: var(--accent);
     text-transform: uppercase;
-    margin-bottom: 20px;
-    animation: textPulse 1.5s ease infinite;
-  }
-  @keyframes textPulse {
-    0%, 100% { opacity: 0.5; }
-    50% { opacity: 1; }
+    margin-bottom: 16px;
   }
   #transition-overlay .overlay-text .target {
-    font-size: clamp(1.5rem, 4vw, 2.5rem);
+    font-size: clamp(1.3rem, 5vw, 2.5rem);
     font-weight: 200;
-    letter-spacing: 0.3em;
+    letter-spacing: 0.2em;
     color: var(--text);
   }
   #transition-overlay .overlay-text .url {
-    margin-top: 20px;
-    font-size: 10px;
-    letter-spacing: 2px;
+    margin-top: 16px;
+    font-size: 9px;
+    letter-spacing: 1px;
     color: var(--accent);
     opacity: 0.6;
     word-break: break-all;
-    max-width: 80vw;
   }
   #transition-overlay .progress-bar {
     position: absolute;
-    bottom: 15%;
+    bottom: 20%;
     left: 50%;
     transform: translateX(-50%);
     width: min(60vw, 400px);
@@ -983,23 +1059,25 @@
     100% { width: 100%; }
   }
 
+  /* 錄製指示 */
   #record-indicator {
     position: fixed;
-    top: 24px;
+    top: calc(16px + var(--safe-top));
     left: 50%;
     transform: translateX(-50%);
     z-index: 10000;
-    padding: 6px 16px;
+    padding: 6px 14px;
     border-radius: 100px;
     background: rgba(255,68,68,0.9);
     color: #fff;
-    font-size: 11px;
-    letter-spacing: 3px;
+    font-size: 10px;
+    letter-spacing: 2px;
     text-transform: uppercase;
     opacity: 0;
     transition: opacity 0.3s;
     pointer-events: none;
     box-shadow: 0 0 30px rgba(255,68,68,0.6);
+    white-space: nowrap;
   }
   #record-indicator.active {
     opacity: 1;
@@ -1007,78 +1085,208 @@
   }
   #record-indicator .dot {
     display: inline-block;
-    width: 8px; height: 8px;
+    width: 7px; height: 7px;
     background: #fff;
     border-radius: 50%;
-    margin-right: 8px;
+    margin-right: 6px;
     animation: blink 0.8s infinite;
   }
+  @keyframes recPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,68,68,0.5); }
+    50% { box-shadow: 0 0 0 8px rgba(255,68,68,0); }
+  }
 
-  #touch-hint {
+  /* 手勢提示（手機顯示觸控手勢） */
+  #gesture-hint {
     position: fixed;
-    bottom: 130px;
+    bottom: calc(120px + var(--safe-bottom));
     left: 50%;
     transform: translateX(-50%);
     z-index: 8;
-    font-size: 10px;
-    letter-spacing: 3px;
+    font-size: 9px;
+    letter-spacing: 2px;
     color: var(--text-faint);
     text-transform: uppercase;
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.6s;
     text-align: center;
+    line-height: 1.8;
+    white-space: nowrap;
+    background: rgba(var(--bg-rgb), 0.6);
+    backdrop-filter: blur(10px);
+    padding: 6px 14px;
+    border-radius: 100px;
   }
-  #touch-hint.visible { opacity: 0.6; }
+  #gesture-hint.visible { opacity: 0.7; }
+  @media (max-width: 700px) {
+    #gesture-hint { font-size: 8px; bottom: calc(110px + var(--safe-bottom)); }
+  }
 
-  /* AI 推薦提示 Toast */
+  /* AI 推薦 Toast */
   #rec-toast {
     position: fixed;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%) scale(0.8);
     z-index: 99999;
-    padding: 20px 36px;
+    padding: 18px 32px;
     border-radius: 16px;
     background: linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,170,0,0.1));
     backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
     border: 1px solid rgba(255,215,0,0.5);
     color: #ffd700;
-    font-size: 13px;
-    letter-spacing: 3px;
+    font-size: 12px;
+    letter-spacing: 2px;
     text-align: center;
     opacity: 0;
     pointer-events: none;
     transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 0 60px rgba(255,215,0,0.4);
+    max-width: 80vw;
   }
   #rec-toast.show {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
   }
   #rec-toast .rec-icon {
+    font-size: 24px;
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  /* 錄製面板（手機簡化） */
+  #record-panel {
+    position: fixed;
+    bottom: 80px;
+    right: 24px;
+    width: 260px;
+    z-index: 999;
+    background: var(--card-bg);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 16px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(20px);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+  @media (max-width: 700px) {
+    #record-panel {
+      left: 50%;
+      right: auto;
+      transform: translateX(-50%) translateY(20px);
+      width: calc(100vw - 32px);
+      max-width: 320px;
+      bottom: calc(80px + var(--safe-bottom));
+    }
+    #record-panel.show {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+
+  /* 手勢彩蛋提示 */
+  #gesture-toast {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.8);
+    z-index: 99999;
+    padding: 20px 40px;
+    border: 1px solid var(--accent);
+    border-radius: 16px;
+    background: var(--card-bg);
+    backdrop-filter: blur(30px);
+    color: var(--text);
+    font-size: 12px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 60px rgba(138,180,255,0.4);
+    white-space: nowrap;
+  }
+  #gesture-toast.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  #gesture-toast .toast-icon {
     font-size: 28px;
     display: block;
     margin-bottom: 10px;
   }
 
-  @media (max-width: 700px) {
-    .nav-grid { grid-template-columns: 1fr; gap: 16px; width: 92vw; }
-    .hud { font-size: 9px; }
-    .nav-card { padding: 24px 20px; }
-    .card-wrap { height: 260px; }
-    #ai-panel { width: calc(100vw - 32px); right: 16px; }
-    #ai-toggle { right: 136px; bottom: 80px; }
-    #record-toggle { right: 80px; bottom: 80px; }
-    #gyro-toggle { right: 24px; bottom: 80px; }
-    #theme-toggle { right: 192px; bottom: 80px; }
-    #sound-toggle { right: 248px; bottom: 80px; }
+  /* 全螢幕按鈕（手機用） */
+  #fullscreen-btn {
+    position: fixed;
+    top: calc(16px + var(--safe-top));
+    right: calc(16px + var(--safe-right));
+    z-index: 100;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+  @media (hover: none) and (pointer: coarse) {
+    #fullscreen-btn { display: flex; }
+  }
+
+  /* 安裝提示（PWA） */
+  #install-hint {
+    position: fixed;
+    bottom: calc(80px + var(--safe-bottom));
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    z-index: 10001;
+    padding: 12px 20px;
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--card-border);
+    border-radius: 100px;
+    color: var(--text);
+    font-size: 11px;
+    letter-spacing: 1px;
+    opacity: 0;
+    transition: all 0.4s;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+  #install-hint.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
+  }
+  #install-hint button {
+    margin-left: 10px;
+    padding: 4px 12px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 100px;
+    font-size: 11px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
   }
 </style>
 </head>
 <body>
 
-<!-- V20：背景影片 -->
-<video id="bg-video" autoplay muted loop playsinline>
+<video id="bg-video" autoplay muted loop playsinline webkit-playsinline>
   <source src="https://cdn.pixabay.com/video/2023/10/22/186004-877365906_large.mp4" type="video/mp4">
 </video>
 
@@ -1089,7 +1297,7 @@
   <div class="gen-seed" id="genSeed">SEED: --------</div>
 </div>
 
-<canvas id="gesture-canvas" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9998;pointer-events:none;"></canvas>
+<canvas id="gesture-canvas"></canvas>
 
 <div class="cursor" id="cursor"></div>
 <div class="cursor-dot" id="cursorDot"></div>
@@ -1151,21 +1359,36 @@
 </div>
 
 <div class="footer-hint" id="footerHint">▸ 點進網站小卡，即可開始使用 ◂</div>
-<div id="touch-hint">雙指縮放 · 旋轉 · 拖曳</div>
+<div id="gesture-hint">畫圓 ◯ · 畫 Z ⚡ · 畫 V ✓ · 畫三角 ▲</div>
 
 <div id="audio-viz"></div>
 
+<!-- 手機控制列 -->
+<div id="mobile-controls">
+  <button class="m-btn" id="m-sound">🔊</button>
+  <button class="m-btn" id="m-theme">🌙</button>
+  <button class="m-btn" id="m-gyro">📱</button>
+  <button class="m-btn" id="m-ai">💬</button>
+  <button class="m-btn" id="m-record">⏺</button>
+</div>
+
+<!-- 桌機控制按鈕 -->
 <button class="ctrl-btn" id="sound-toggle">🔊</button>
 <button class="ctrl-btn" id="theme-toggle">🌙</button>
 <button class="ctrl-btn" id="gyro-toggle">📱</button>
 <button class="ctrl-btn" id="ai-toggle">💬</button>
 <button class="ctrl-btn" id="record-toggle">⏺</button>
 
+<!-- 全螢幕按鈕 -->
+<button id="fullscreen-btn">⛶</button>
+
+<!-- AI 面板 -->
 <div id="ai-panel">
   <div class="ai-header">
     <div class="ai-title">AI 助理</div>
     <div class="ai-actions">
       <button id="voice-toggle" title="語音回覆">🔈</button>
+      <button id="ai-close" title="關閉">✕</button>
       <div class="ai-status"><span class="dot"></span>ONLINE</div>
     </div>
   </div>
@@ -1176,15 +1399,16 @@
   </div>
 </div>
 
-<div id="record-panel" style="position:fixed;bottom:80px;right:24px;width:280px;z-index:999;background:var(--card-bg);backdrop-filter:blur(30px) saturate(180%);border:1px solid var(--card-border);border-radius:16px;padding:16px;opacity:0;visibility:hidden;transform:translateY(20px);transition:all 0.4s cubic-bezier(0.4,0,0.2,1);box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+<!-- 錄製面板 -->
+<div id="record-panel">
   <div style="font-size:11px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;margin-bottom:12px;">軌跡錄製</div>
-  <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;display:flex;justify-content:space-between;"><span>狀態</span><span class="val" id="recStatus" style="color:var(--accent);font-weight:bold;">待機</span></div>
-  <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;display:flex;justify-content:space-between;"><span>點數</span><span class="val" id="recPoints" style="color:var(--accent);font-weight:bold;">0</span></div>
-  <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;display:flex;justify-content:space-between;"><span>時長</span><span class="val" id="recDuration" style="color:var(--accent);font-weight:bold;">0.0s</span></div>
-  <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;display:flex;justify-content:space-between;"><span>已儲存</span><span class="val" id="recSaved" style="color:var(--accent);font-weight:bold;">0</span></div>
+  <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;display:flex;justify-content:space-between;"><span>狀態</span><span style="color:var(--accent);font-weight:bold;" id="recStatus">待機</span></div>
+  <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;display:flex;justify-content:space-between;"><span>點數</span><span style="color:var(--accent);font-weight:bold;" id="recPoints">0</span></div>
+  <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;display:flex;justify-content:space-between;"><span>時長</span><span style="color:var(--accent);font-weight:bold;" id="recDuration">0.0s</span></div>
+  <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;display:flex;justify-content:space-between;"><span>已儲存</span><span style="color:var(--accent);font-weight:bold;" id="recSaved">0</span></div>
   <div style="display:flex;gap:8px;margin-top:14px;">
-    <button class="rec-btn" id="recPlayBtn" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--card-border);background:rgba(138,180,255,0.1);color:var(--text);font-family:inherit;font-size:11px;letter-spacing:1px;cursor:none;transition:all 0.3s;">▶ 播放</button>
-    <button class="rec-btn danger" id="recClearBtn" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,68,68,0.3);background:rgba(255,68,68,0.1);color:#ff6666;font-family:inherit;font-size:11px;letter-spacing:1px;cursor:none;transition:all 0.3s;">✕ 清除</button>
+    <button id="recPlayBtn" style="flex:1;padding:10px 12px;border-radius:8px;border:1px solid var(--card-border);background:rgba(138,180,255,0.1);color:var(--text);font-family:inherit;font-size:11px;letter-spacing:1px;cursor:pointer;-webkit-tap-highlight-color:transparent;">▶ 播放</button>
+    <button id="recClearBtn" style="flex:1;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,68,68,0.3);background:rgba(255,68,68,0.1);color:#ff6666;font-family:inherit;font-size:11px;letter-spacing:1px;cursor:pointer;-webkit-tap-highlight-color:transparent;">✕ 清除</button>
   </div>
 </div>
 
@@ -1193,6 +1417,16 @@
 <div id="rec-toast">
   <span class="rec-icon">✦</span>
   <div id="recToastText">AI 推薦</div>
+</div>
+
+<div id="gesture-toast">
+  <span class="toast-icon" id="toastIcon">✦</span>
+  <div id="toastText">彩蛋</div>
+</div>
+
+<div id="install-hint">
+  📱 加到主畫面
+  <button id="install-btn">安裝</button>
 </div>
 
 <div id="transition-overlay">
@@ -1221,6 +1455,20 @@ const GEMINI_MODEL = 'gemini-2.0-flash';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 /* ============================================================
+   裝置偵測
+   ============================================================ */
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+                 || ('ontouchstart' in window && window.innerWidth < 900);
+const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+// 手機降級設定
+const PERF = {
+  particleCount: isMobile ? 800 : 2000,
+  trailsMax: isMobile ? 20 : 50,
+  dpr: isMobile ? Math.min(window.devicePixelRatio, 1.5) : Math.min(window.devicePixelRatio, 2),
+  auroraOctaves: isMobile ? 3 : 5
+};
+
+/* ============================================================
    0. 種子
    ============================================================ */
 const SEED = Math.floor(Math.random() * 99999999);
@@ -1232,7 +1480,7 @@ function seededRandom() {
 }
 
 /* ============================================================
-   1. 音效系統（含 A20 回音空間）
+   1. 音效系統
    ============================================================ */
 let audioCtx = null, masterGain = null, musicGain = null, sfxGain = null;
 let convolver = null, wetGain = null, dryGain = null;
@@ -1244,7 +1492,7 @@ let musicIntensity = 0, targetIntensity = 0;
 let bpm = 90, beatCount = 0;
 
 const vizEl = document.getElementById('audio-viz');
-for (let i = 0; i < 36; i++) {
+for (let i = 0; i < 30; i++) {
   const bar = document.createElement('div');
   bar.className = 'bar';
   vizEl.appendChild(bar);
@@ -1253,13 +1501,14 @@ const vizBars = vizEl.querySelectorAll('.bar');
 
 function initAudio() {
   if (audioCtx) return;
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  } catch (e) { return; }
 
   masterGain = audioCtx.createGain();
   masterGain.gain.value = volumeLevel;
   masterGain.connect(audioCtx.destination);
 
-  // A20：建立回音空間
   convolver = audioCtx.createConvolver();
   convolver.buffer = createReverbImpulse(audioCtx, 3.5, 2.5);
   wetGain = audioCtx.createGain();
@@ -1267,7 +1516,6 @@ function initAudio() {
   dryGain = audioCtx.createGain();
   dryGain.gain.value = 0.7;
 
-  // 混音架構：來源 → dryGain → master；來源 → convolver → wetGain → master
   dryGain.connect(masterGain);
   convolver.connect(wetGain);
   wetGain.connect(masterGain);
@@ -1293,7 +1541,6 @@ function initAudio() {
   setTimeout(() => vizEl.classList.add('visible'), 500);
 }
 
-/* A20：產生脈衝響應（模擬大教堂 / 洞穴） */
 function createReverbImpulse(ctx, duration, decay) {
   const rate = ctx.sampleRate;
   const length = rate * duration;
@@ -1553,12 +1800,13 @@ function playSpatialSound(x, y, freq, duration = 0.5) {
 }
 
 /* ============================================================
-   2. 語音導航 + AI2 語音回覆
+   2. 語音
    ============================================================ */
 let chineseVoice = null;
 let voicesLoaded = false;
 let voiceReplyEnabled = false;
 function loadVoices() {
+  if (!('speechSynthesis' in window)) return;
   const voices = window.speechSynthesis.getVoices();
   chineseVoice = voices.find(v => v.lang.includes('zh-TW')) ||
                  voices.find(v => v.lang.includes('zh')) ||
@@ -1572,52 +1820,61 @@ if ('speechSynthesis' in window) {
 function speak(text) {
   if (!('speechSynthesis' in window)) return;
   if (!voicesLoaded) loadVoices();
-  window.speechSynthesis.cancel();
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.lang = 'zh-TW';
-  utter.rate = 1.1;
-  utter.pitch = 1.0;
-  utter.volume = 0.8;
-  if (chineseVoice) utter.voice = chineseVoice;
-  window.speechSynthesis.speak(utter);
+  try {
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'zh-TW';
+    utter.rate = 1.1;
+    utter.pitch = 1.0;
+    utter.volume = 0.8;
+    if (chineseVoice) utter.voice = chineseVoice;
+    window.speechSynthesis.speak(utter);
+  } catch (e) {}
 }
-
-/* AI2：AI 回覆語音朗讀 */
 function speakAIReply(text) {
   if (!voiceReplyEnabled) return;
   if (!('speechSynthesis' in window)) return;
   if (!voicesLoaded) loadVoices();
-  window.speechSynthesis.cancel();
-  // 移除 emoji 和特殊符號
   const cleanText = text.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').replace(/[✦▸◯▲✓⚡]/g, '').trim();
-  const utter = new SpeechSynthesisUtterance(cleanText);
-  utter.lang = 'zh-TW';
-  utter.rate = 1.15;
-  utter.pitch = 1.05;
-  utter.volume = 0.9;
-  if (chineseVoice) utter.voice = chineseVoice;
-  utter.onstart = () => aiToggle.classList.add('speaking');
-  utter.onend = () => aiToggle.classList.remove('speaking');
-  window.speechSynthesis.speak(utter);
+  try {
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(cleanText);
+    utter.lang = 'zh-TW';
+    utter.rate = 1.15;
+    utter.pitch = 1.05;
+    utter.volume = 0.9;
+    if (chineseVoice) utter.voice = chineseVoice;
+    utter.onstart = () => aiToggle.classList.add('speaking');
+    utter.onend = () => aiToggle.classList.remove('speaking');
+    window.speechSynthesis.speak(utter);
+  } catch (e) {}
 }
 
 /* ============================================================
-   3. 深淺主題
+   3. 主題
    ============================================================ */
 const themeToggle = document.getElementById('theme-toggle');
+const mTheme = document.getElementById('m-theme');
 let currentTheme = localStorage.getItem('theme') || 'dark';
 if (currentTheme === 'light') document.body.setAttribute('data-theme', 'light');
-themeToggle.textContent = currentTheme === 'dark' ? '🌙' : '☀️';
-
-themeToggle.addEventListener('click', () => {
+updateThemeBtn();
+function updateThemeBtn() {
+  const icon = currentTheme === 'dark' ? '🌙' : '☀️';
+  themeToggle.textContent = icon;
+  mTheme.textContent = icon;
+}
+function toggleTheme() {
   currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
   if (currentTheme === 'dark') document.body.removeAttribute('data-theme');
   else document.body.setAttribute('data-theme', 'light');
-  themeToggle.textContent = currentTheme === 'dark' ? '🌙' : '☀️';
+  updateThemeBtn();
   localStorage.setItem('theme', currentTheme);
   updateThreeTheme();
   playHoverSound();
-});
+  document.querySelector('meta[name="theme-color"]').setAttribute('content', currentTheme === 'dark' ? '#05050f' : '#f0f2f8');
+}
+themeToggle.addEventListener('click', toggleTheme);
+mTheme.addEventListener('click', toggleTheme);
 
 /* ============================================================
    4. 時鐘 + 天氣
@@ -1662,7 +1919,7 @@ if (navigator.geolocation) {
 }
 
 /* ============================================================
-   5. X2 AI 聊天 + AI2 語音 + AI5 推薦
+   5. AI 聊天
    ============================================================ */
 const SYSTEM_PROMPT = `你是「展商城」網站的 AI 助理。
 網站有兩個主要功能：
@@ -1671,7 +1928,7 @@ const SYSTEM_PROMPT = `你是「展商城」網站的 AI 助理。
 
 網站特色：
 - 3D 互動場景、粒子文字、極光、背景影片
-- 卡片 3D 翻轉、液態金屬邊框、光線追蹤反射
+- 卡片 3D 翻轉、液態金屬邊框
 - 語音導航、手勢彩蛋（畫圓、畫 Z、畫 V、畫三角形）
 - 滑鼠軌跡錄製、播放
 - 手機雙指縮放旋轉
@@ -1679,19 +1936,11 @@ const SYSTEM_PROMPT = `你是「展商城」網站的 AI 助理。
 - 回音空間音效
 
 請用繁體中文、親切、簡潔地回答。回覆不要超過 80 字。
-如果問到網站相關問題，引導使用者使用上述功能。
-如果問到無關的問題，可以簡短回答但引導回網站主題。
 
 【重要】在回覆最後，用以下格式標註推薦的卡片（只能選 shop 或 rate 或 none）：
 [RECOMMEND:shop]
-或
-[RECOMMEND:rate]
-或
-[RECOMMEND:none]
-
-例如問「我要買東西」，回覆：
-「要買東西的話，點左邊的『顧客開單』卡片，就可以挑選商品建立訂單 📦
-[RECOMMEND:shop]」`;
+或 [RECOMMEND:rate]
+或 [RECOMMEND:none]`;
 
 const aiToggle = document.getElementById('ai-toggle');
 const aiPanel = document.getElementById('ai-panel');
@@ -1699,35 +1948,40 @@ const aiMessages = document.getElementById('aiMessages');
 const aiInput = document.getElementById('ai-input');
 const aiSend = document.getElementById('ai-send');
 const voiceToggle = document.getElementById('voice-toggle');
+const aiClose = document.getElementById('ai-close');
+const mAi = document.getElementById('m-ai');
 
 let aiOpen = false;
 let aiHistory = [];
 let aiBusy = false;
 
-/* AI2：語音回覆開關 */
 voiceToggle.addEventListener('click', () => {
   voiceReplyEnabled = !voiceReplyEnabled;
   voiceToggle.classList.toggle('active', voiceReplyEnabled);
   voiceToggle.textContent = voiceReplyEnabled ? '🔊' : '🔈';
   speak(voiceReplyEnabled ? '語音回覆已開啟' : '語音回覆已關閉');
-  if (voiceReplyEnabled) {
-    aiToggle.classList.add('speaking');
-    setTimeout(() => aiToggle.classList.remove('speaking'), 1500);
-  }
 });
 
-aiToggle.addEventListener('click', () => {
-  aiOpen = !aiOpen;
-  aiPanel.classList.toggle('active', aiOpen);
-  aiToggle.classList.toggle('active', aiOpen);
-  if (aiOpen && aiMessages.children.length === 0) {
+function openAI() {
+  aiOpen = true;
+  aiPanel.classList.add('active');
+  aiToggle.classList.add('active');
+  if (aiMessages.children.length === 0) {
     setTimeout(() => {
       const greeting = '你好！我是展商城的 AI 助理 🤖 有什麼我可以幫你的嗎？';
       addMessage(greeting, 'bot');
       if (voiceReplyEnabled) speakAIReply(greeting);
     }, 300);
   }
-});
+}
+function closeAI() {
+  aiOpen = false;
+  aiPanel.classList.remove('active');
+  aiToggle.classList.remove('active');
+}
+aiToggle.addEventListener('click', () => { if (aiOpen) closeAI(); else openAI(); });
+mAi.addEventListener('click', () => { if (aiOpen) closeAI(); else openAI(); });
+aiClose.addEventListener('click', closeAI);
 
 function addMessage(text, role, allowSpeak = true) {
   const msg = document.createElement('div');
@@ -1737,7 +1991,6 @@ function addMessage(text, role, allowSpeak = true) {
     const btn = document.createElement('button');
     btn.className = 'speak-btn';
     btn.textContent = '🔊';
-    btn.title = '朗讀';
     btn.addEventListener('click', e => {
       e.stopPropagation();
       speak(text);
@@ -1758,7 +2011,6 @@ function addTyping() {
   return msg;
 }
 
-/* AI5：解析 AI 回覆中的推薦 */
 function parseRecommendation(text) {
   const match = text.match(/\[RECOMMEND:(shop|rate|none)\]/i);
   if (match) {
@@ -1767,35 +2019,21 @@ function parseRecommendation(text) {
   return { cleanText: text, target: null };
 }
 
-/* AI5：套用推薦到卡片 */
 function applyRecommendation(target) {
-  // 先清除所有推薦
   document.querySelectorAll('.card-wrap').forEach(w => w.classList.remove('recommended'));
   if (!target || target === 'none') return;
-
   const wrap = document.querySelector(`.card-wrap[data-id="${target}"]`);
   if (!wrap) return;
-
   wrap.classList.add('recommended');
-
-  // 顯示 toast
   const toast = document.getElementById('rec-toast');
-  const title = wrap.dataset.title;
-  document.getElementById('recToastText').textContent = `推薦：${title}`;
+  document.getElementById('recToastText').textContent = `推薦：${wrap.dataset.title}`;
   toast.classList.add('show');
   playRecSound();
   setTimeout(() => toast.classList.remove('show'), 2500);
-
-  // 3 秒後自動移除高亮（但保留，讓使用者看清楚）
-  // 這裡選擇保留，使用者點擊或問下一題才會更新
 }
 
-/* ===== 呼叫 Gemini API ===== */
 async function callGemini(userMessage) {
-  if (!GEMINI_API_KEY || GEMINI_API_KEY === 'YOUR_NEW_API_KEY_HERE') {
-    return null;
-  }
-
+  if (!GEMINI_API_KEY || GEMINI_API_KEY === 'YOUR_NEW_API_KEY_HERE') return null;
   const contents = [];
   aiHistory.slice(-6).forEach(msg => {
     contents.push({
@@ -1803,176 +2041,109 @@ async function callGemini(userMessage) {
       parts: [{ text: msg.content }]
     });
   });
-  contents.push({
-    role: 'user',
-    parts: [{ text: userMessage }]
-  });
-
+  contents.push({ role: 'user', parts: [{ text: userMessage }] });
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
-
     const res = await fetch(GEMINI_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: SYSTEM_PROMPT }]
-        },
+        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
         contents: contents,
-        generationConfig: {
-          temperature: 0.9,
-          maxOutputTokens: 200,
-          topP: 0.95
-        }
+        generationConfig: { temperature: 0.9, maxOutputTokens: 200, topP: 0.95 }
       }),
       signal: controller.signal
     });
-
     clearTimeout(timeout);
-
-    if (!res.ok) {
-      console.warn('Gemini API 錯誤:', res.status);
-      return null;
-    }
-
+    if (!res.ok) return null;
     const data = await res.json();
     if (data.candidates && data.candidates[0] && data.candidates[0].content) {
       return data.candidates[0].content.parts[0].text.trim();
     }
     return null;
-  } catch (e) {
-    console.warn('Gemini 呼叫失敗:', e.message);
-    return null;
-  }
+  } catch (e) { return null; }
 }
 
-/* ===== 內建回覆（含推薦邏輯） ===== */
 function generateBuiltinReply(input) {
   const q = input.toLowerCase().trim();
-
   if (/你好|嗨|hi|hello|哈囉|安安/.test(q)) {
     return ['你好！很高興見到你 👋', '嗨！有什麼我可以幫忙的嗎？', '哈囉！我是展商城的 AI 助理 ✨'][Math.floor(Math.random() * 3)];
   }
   if (/開單|下單|購買|買|商城|商品|shop/.test(q)) {
-    return '要開單的話，點擊左邊的「顧客開單」卡片，會開啟新分頁讓你挑選商品、建立訂單 📦\n[RECOMMEND:shop]';
+    return '要開單的話，點「顧客開單」卡片，會開啟新分頁讓你挑選商品 📦\n[RECOMMEND:shop]';
   }
   if (/評價|查詢|訂單|查|rate|評分/.test(q)) {
-    return '要查詢訂單或留下評價，點擊右邊的「訂單評價與查詢」卡片 📝\n[RECOMMEND:rate]';
+    return '要查詢訂單或留下評價，點「訂單評價與查詢」卡片 📝\n[RECOMMEND:rate]';
   }
   if (/錄|軌跡|重播|record|播放/.test(q)) {
-    return '點右下角的 ⏺ 按鈕可以錄製你的滑鼠軌跡，再按 ▶ 就能重播 👻\n[RECOMMEND:none]';
+    return '點控制列的 ⏺ 按鈕可以錄製滑鼠 / 手指軌跡 👻\n[RECOMMEND:none]';
   }
   if (/觸控|手機|縮放|旋轉|touch/.test(q)) {
     return '手機上用「雙指縮放」可以放大縮小 3D 場景 📱\n[RECOMMEND:none]';
   }
   if (/語音|聲音|說話|speak|voice/.test(q)) {
-    return '這個網站有語音導航，AI 回覆也能語音朗讀 🔊 點右上角 🔈 開啟\n[RECOMMEND:none]';
+    return 'AI 回覆能語音朗讀 🔊 點右上角 🔈 開啟\n[RECOMMEND:none]';
   }
   if (/主題|顏色|深色|淺色|theme/.test(q)) {
-    return '點右下角的 🌙 / ☀️ 可以切換深色 / 淺色模式 🌗\n[RECOMMEND:none]';
+    return '點控制列的 🌙 / ☀️ 可以切換深淺模式 🌗\n[RECOMMEND:none]';
   }
   if (/音樂|音效|聲音|music|bgm|回音/.test(q)) {
-    return '背景音樂是即時生成的 🎵 有回音空間效果，像在教堂一樣\n[RECOMMEND:none]';
+    return '背景音樂是即時生成的 🎵 有回音空間效果\n[RECOMMEND:none]';
   }
   if (/你是誰|你是|ai|助理|誰/.test(q)) {
     return '我是展商城的 AI 助理 🤖 由 Gemini 驅動\n[RECOMMEND:none]';
   }
   if (/推薦|建議|該點|哪個|選哪/.test(q)) {
-    // AI5：推薦邏輯
-    if (/買|購物|商品|訂單|開單/.test(q)) {
-      return '我推薦你點「顧客開單」，進去挑選商品建立訂單 📦\n[RECOMMEND:shop]';
-    }
-    if (/評價|查詢|看訂單|評分/.test(q)) {
-      return '我推薦你點「訂單評價與查詢」，查看訂單狀態 📝\n[RECOMMEND:rate]';
-    }
+    if (/買|購物|商品|訂單|開單/.test(q)) return '我推薦「顧客開單」，進去挑選商品 📦\n[RECOMMEND:shop]';
+    if (/評價|查詢|看訂單|評分/.test(q)) return '我推薦「訂單評價與查詢」，查看訂單狀態 📝\n[RECOMMEND:rate]';
     return '兩個都試試看！「顧客開單」是買東西，「訂單評價與查詢」是看訂單 💡\n[RECOMMEND:none]';
   }
   if (/幫我|怎麼|如何|怎麼用|使用/.test(q)) {
     return '你可以：\n• 點卡片 → 進入商城\n• 畫手勢 → 觸發彩蛋\n• 按 💬 → 跟我聊天\n[RECOMMEND:none]';
   }
-  if (/謝謝|感謝|thank/.test(q)) {
-    return ['不客氣！有問題再問我 😊\n[RECOMMEND:none]', '很高興能幫上忙 ✨\n[RECOMMEND:none]'][Math.floor(Math.random() * 2)];
-  }
-  if (/再見|掰|bye|拜拜/.test(q)) {
-    return '再見！祝你購物愉快 👋\n[RECOMMEND:none]';
-  }
-  if (/天氣|weather|溫度/.test(q)) {
-    return `現在的天氣是：${weatherText.textContent} 🌤️\n[RECOMMEND:none]`;
-  }
-  if (/時間|幾點|time/.test(q)) {
-    return `現在時間是 ${hudClock.textContent} ⏰\n[RECOMMEND:none]`;
-  }
-
+  if (/謝謝|感謝|thank/.test(q)) return '不客氣！有問題再問我 😊\n[RECOMMEND:none]';
+  if (/再見|掰|bye|拜拜/.test(q)) return '再見！祝你購物愉快 👋\n[RECOMMEND:none]';
+  if (/天氣|weather|溫度/.test(q)) return `現在的天氣是：${weatherText.textContent} 🌤️\n[RECOMMEND:none]`;
+  if (/時間|幾點|time/.test(q)) return `現在時間是 ${hudClock.textContent} ⏰\n[RECOMMEND:none]`;
   const defaults = [
     '這個問題很有意思 🤔 你可以試試點卡片、或畫手勢！\n[RECOMMEND:none]',
     '我不太確定，但你可以問我「怎麼用」「商城」這些問題 💡\n[RECOMMEND:none]',
-    '換個方式問問看？例如「怎麼開單」✨\n[RECOMMEND:none]',
-    '試試問我網站相關的問題吧 🤖\n[RECOMMEND:none]'
+    '換個方式問問看？例如「怎麼開單」✨\n[RECOMMEND:none]'
   ];
   return defaults[Math.floor(Math.random() * defaults.length)];
 }
 
 aiSend.addEventListener('click', sendMessage);
-aiInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter') sendMessage();
-});
+aiInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
 
 async function sendMessage() {
   if (aiBusy) return;
   const text = aiInput.value.trim();
   if (!text) return;
-
   aiBusy = true;
   aiSend.disabled = true;
-
   addMessage(text, 'user');
   aiHistory.push({ role: 'user', content: text });
   aiInput.value = '';
   playChatSound();
-
   const typingEl = addTyping();
-
   let rawReply = await callGemini(text);
-  if (!rawReply) {
-    rawReply = generateBuiltinReply(text);
-  }
-
-  // AI5：解析推薦
+  if (!rawReply) rawReply = generateBuiltinReply(text);
   const { cleanText, target } = parseRecommendation(rawReply);
-
   typingEl.remove();
   addMessage(cleanText, 'bot');
   playChatSound();
   aiHistory.push({ role: 'assistant', content: cleanText });
-
-  // AI2：語音朗讀
-  if (voiceReplyEnabled) {
-    speakAIReply(cleanText);
-  }
-
-  // AI5：套用推薦
-  if (target) {
-    applyRecommendation(target);
-  }
-
+  if (voiceReplyEnabled) speakAIReply(cleanText);
+  if (target) applyRecommendation(target);
   aiBusy = false;
   aiSend.disabled = false;
   aiInput.focus();
 }
 
-/* 點擊機器人訊息的朗讀按鈕 */
-document.addEventListener('click', e => {
-  if (e.target.classList.contains('speak-btn')) {
-    const msg = e.target.closest('.ai-msg');
-    if (msg) {
-      speak(msg.textContent.replace('🔊', '').trim());
-    }
-  }
-});
-
 /* ============================================================
-   6. M8 滑鼠軌跡錄製
+   6. 軌跡錄製
    ============================================================ */
 const recordToggle = document.getElementById('record-toggle');
 const recordPanel = document.getElementById('record-panel');
@@ -1983,6 +2154,7 @@ const recSaved = document.getElementById('recSaved');
 const recPlayBtn = document.getElementById('recPlayBtn');
 const recClearBtn = document.getElementById('recClearBtn');
 const recordIndicator = document.getElementById('record-indicator');
+const mRecord = document.getElementById('m-record');
 
 let recordState = 'idle';
 let recordedPath = [];
@@ -1993,28 +2165,43 @@ let playbackGhost = null;
 
 recSaved.textContent = savedPaths.length;
 
-recordToggle.addEventListener('click', () => {
+function toggleRecord() {
   if (recordState === 'recording') {
     stopRecording();
   } else if (recordState === 'idle') {
     startRecording();
+    showRecordPanel();
+  }
+}
+recordToggle.addEventListener('click', toggleRecord);
+mRecord.addEventListener('click', toggleRecord);
+
+function showRecordPanel() {
+  if (isMobile) {
+    recordPanel.classList.add('show');
+    recordPanel.style.opacity = '1';
+    recordPanel.style.visibility = 'visible';
+    recordPanel.style.transform = 'translateX(-50%) translateY(0)';
+  } else {
     recordPanel.style.opacity = '1';
     recordPanel.style.visibility = 'visible';
     recordPanel.style.transform = 'translateY(0)';
-    setTimeout(() => {
-      recordPanel.style.opacity = '0';
-      recordPanel.style.visibility = 'hidden';
-      recordPanel.style.transform = 'translateY(20px)';
-    }, 4000);
   }
-});
+  setTimeout(() => {
+    if (isMobile) {
+      recordPanel.classList.remove('show');
+    }
+    recordPanel.style.opacity = '0';
+    recordPanel.style.visibility = 'hidden';
+  }, 4000);
+}
 
 function startRecording() {
   recordState = 'recording';
   recordedPath = [];
   recordStartTime = Date.now();
   recordToggle.classList.add('recording');
-  recordToggle.classList.remove('playing');
+  mRecord.classList.add('recording');
   recordIndicator.classList.add('active');
   recStatus.textContent = '錄製中';
   recStatus.style.color = '#ff4444';
@@ -2024,6 +2211,7 @@ function startRecording() {
 function stopRecording() {
   recordState = 'idle';
   recordToggle.classList.remove('recording');
+  mRecord.classList.remove('recording');
   recordIndicator.classList.remove('active');
   recStatus.textContent = '待機';
   recStatus.style.color = '';
@@ -2042,27 +2230,32 @@ function stopRecording() {
   }
 }
 
-document.addEventListener('mousemove', e => {
+function handleMoveForRecord(x, y) {
   if (recordState === 'recording') {
-    recordedPath.push({ x: e.clientX, y: e.clientY, t: Date.now() - recordStartTime });
+    recordedPath.push({ x, y, t: Date.now() - recordStartTime });
     recPoints.textContent = recordedPath.length;
     recDuration.textContent = ((Date.now() - recordStartTime) / 1000).toFixed(1) + 's';
   }
-});
+}
+document.addEventListener('mousemove', e => handleMoveForRecord(e.clientX, e.clientY));
+document.addEventListener('touchmove', e => {
+  if (e.touches.length > 0) {
+    handleMoveForRecord(e.touches[0].clientX, e.touches[0].clientY);
+  }
+}, { passive: true });
 
 recPlayBtn.addEventListener('click', () => {
   if (recordState === 'playing') return;
-  if (savedPaths.length === 0) {
-    speak('沒有儲存的軌跡');
-    return;
-  }
+  if (savedPaths.length === 0) { speak('沒有儲存的軌跡'); return; }
   playPath(savedPaths[savedPaths.length - 1]);
 });
 
 function playPath(path) {
   recordState = 'playing';
   recordToggle.classList.add('playing');
+  mRecord.classList.add('playing');
   recordToggle.classList.remove('recording');
+  mRecord.classList.remove('recording');
   recStatus.textContent = '播放中';
   recStatus.style.color = '#4ade80';
   playStartTime = Date.now();
@@ -2070,16 +2263,12 @@ function playPath(path) {
   if (!playbackGhost) {
     playbackGhost = document.createElement('div');
     playbackGhost.style.cssText = `
-      position: fixed;
-      width: 30px; height: 30px;
-      border: 2px solid #4ade80;
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 99999;
+      position: fixed; width: 30px; height: 30px;
+      border: 2px solid #4ade80; border-radius: 50%;
+      pointer-events: none; z-index: 99999;
       transform: translate(-50%, -50%);
       box-shadow: 0 0 20px #4ade80, inset 0 0 10px rgba(74,222,128,0.5);
-      transition: opacity 0.3s;
-      opacity: 0;
+      transition: opacity 0.3s; opacity: 0;
     `;
     document.body.appendChild(playbackGhost);
   }
@@ -2104,11 +2293,8 @@ function playPath(path) {
       }
       i++;
     }
-    if (i < path.points.length) {
-      requestAnimationFrame(step);
-    } else {
-      stopPlayback();
-    }
+    if (i < path.points.length) requestAnimationFrame(step);
+    else stopPlayback();
   }
   step();
 }
@@ -2116,6 +2302,7 @@ function playPath(path) {
 function stopPlayback() {
   recordState = 'idle';
   recordToggle.classList.remove('playing');
+  mRecord.classList.remove('playing');
   recStatus.textContent = '待機';
   recStatus.style.color = '';
   if (playbackGhost) playbackGhost.style.opacity = '0';
@@ -2133,39 +2320,43 @@ recClearBtn.addEventListener('click', () => {
 });
 
 /* ============================================================
-   7. 自訂游標
+   7. 游標 / 觸控高光
    ============================================================ */
 const cursorEl = document.getElementById('cursor');
 const cursorDot = document.getElementById('cursorDot');
-document.addEventListener('mousemove', e => {
-  cursorEl.style.left = e.clientX + 'px';
-  cursorEl.style.top = e.clientY + 'px';
-  cursorDot.style.left = e.clientX + 'px';
-  cursorDot.style.top = e.clientY + 'px';
 
-  // V26：更新卡片光線追蹤高光
+function updateCursorAndHighlight(x, y) {
+  if (!isTouch) {
+    cursorEl.style.left = x + 'px';
+    cursorEl.style.top = y + 'px';
+    cursorDot.style.left = x + 'px';
+    cursorDot.style.top = y + 'px';
+  }
   document.querySelectorAll('.card-wrap').forEach(wrap => {
     const rect = wrap.getBoundingClientRect();
     const hl = wrap.querySelector('.highlight');
     if (hl) {
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      hl.style.left = x + 'px';
-      hl.style.top = y + 'px';
+      hl.style.left = (x - rect.left) + 'px';
+      hl.style.top = (y - rect.top) + 'px';
     }
   });
-});
+  const xPad = String(Math.floor(x)).padStart(4, '0');
+  const yPad = String(Math.floor(y)).padStart(4, '0');
+  document.getElementById('hudCoords').textContent = `X:${xPad} Y:${yPad}`;
+}
+
+document.addEventListener('mousemove', e => updateCursorAndHighlight(e.clientX, e.clientY));
+document.addEventListener('touchmove', e => {
+  if (e.touches.length > 0) {
+    updateCursorAndHighlight(e.touches[0].clientX, e.touches[0].clientY);
+  }
+}, { passive: true });
+
 document.addEventListener('mousedown', () => cursorEl.classList.add('active'));
 document.addEventListener('mouseup', () => cursorEl.classList.remove('active'));
 
-document.addEventListener('mousemove', e => {
-  const x = String(Math.floor(e.clientX)).padStart(4, '0');
-  const y = String(Math.floor(e.clientY)).padStart(4, '0');
-  document.getElementById('hudCoords').textContent = `X:${x} Y:${y}`;
-});
-
 /* ============================================================
-   8. Three.js 3D 場景 + V22 極光 + V26 光線追蹤
+   8. Three.js
    ============================================================ */
 let scene, camera, renderer, meshGroup, wireframeMesh, pointsMesh;
 let auroraMesh, auroraMaterial;
@@ -2201,32 +2392,22 @@ function hslToHex(h, s, l) {
   return parseInt(`${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`, 16);
 }
 
-/* V22：極光 Shader */
 const auroraVertexShader = `
   varying vec2 vUv;
-  varying vec3 vPos;
   void main() {
     vUv = uv;
-    vPos = position;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
-
 const auroraFragmentShader = `
   uniform float uTime;
   uniform vec3 uColor1;
   uniform vec3 uColor2;
   uniform float uIntensity;
   varying vec2 vUv;
-  varying vec3 vPos;
-
-  // 簡易雜訊
-  float hash(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-  }
+  float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
   float noise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
+    vec2 i = floor(p); vec2 f = fract(p);
     f = f * f * (3.0 - 2.0 * f);
     float a = hash(i);
     float b = hash(i + vec2(1.0, 0.0));
@@ -2235,35 +2416,22 @@ const auroraFragmentShader = `
     return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
   }
   float fbm(vec2 p) {
-    float v = 0.0;
-    float a = 0.5;
-    for (int i = 0; i < 5; i++) {
-      v += a * noise(p);
-      p *= 2.0;
-      a *= 0.5;
-    }
+    float v = 0.0; float a = 0.5;
+    for (int i = 0; i < OCTAVES; i++) { v += a * noise(p); p *= 2.0; a *= 0.5; }
     return v;
   }
-
   void main() {
     vec2 uv = vUv;
-    // 極光垂直流動
     float t = uTime * 0.15;
     float n = fbm(vec2(uv.x * 3.0, uv.y * 2.0 + t));
     float n2 = fbm(vec2(uv.x * 5.0 + t * 0.5, uv.y * 3.0 - t));
     float band = smoothstep(0.3, 0.9, n) * smoothstep(0.2, 0.8, n2);
-
-    // 上緣漸層
     float fade = smoothstep(0.0, 0.5, uv.y) * smoothstep(1.0, 0.5, uv.y);
-
-    // 顏色混合
     vec3 col = mix(uColor1, uColor2, n);
     col += vec3(0.2, 0.8, 0.5) * band * 0.5;
-
-    float alpha = band * fade * uIntensity;
-    gl_FragColor = vec4(col, alpha);
+    gl_FragColor = vec4(col, band * fade * uIntensity);
   }
-`;
+`.replace('OCTAVES', PERF.auroraOctaves);
 
 function initThree() {
   generatePaletteFromSeed();
@@ -2277,9 +2445,9 @@ function initThree() {
   camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
   camera.position.z = 8;
 
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: !isMobile, alpha: true, powerPreference: 'high-performance' });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(PERF.dpr);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
   clock = new THREE.Clock();
@@ -2287,8 +2455,7 @@ function initThree() {
   meshGroup = new THREE.Group();
   scene.add(meshGroup);
 
-  // V26：光線追蹤感（用高光反射材質）
-  const geo = new THREE.IcosahedronGeometry(2.5, 2);
+  const geo = new THREE.IcosahedronGeometry(2.5, 1);
   wireframeMesh = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({
     color: palette3D.color1,
     wireframe: true,
@@ -2303,7 +2470,6 @@ function initThree() {
   }));
   meshGroup.add(wireframeMesh);
 
-  // 內層：實心 + 高反射
   const innerGeo = new THREE.IcosahedronGeometry(1.4, 0);
   const innerMat = new THREE.MeshPhysicalMaterial({
     color: palette3D.color2,
@@ -2315,12 +2481,10 @@ function initThree() {
     emissive: palette3D.color2,
     emissiveIntensity: 0.5
   });
-  const innerMesh = new THREE.Mesh(innerGeo, innerMat);
-  meshGroup.add(innerMesh);
+  meshGroup.add(new THREE.Mesh(innerGeo, innerMat));
 
-  // 粒子雲
   const pointsGeo = new THREE.BufferGeometry();
-  const count = 2000;
+  const count = PERF.particleCount;
   const positions = new Float32Array(count * 3);
   for (let i = 0; i < count * 3; i++) positions[i] = (Math.random() - 0.5) * 40;
   pointsGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -2329,17 +2493,14 @@ function initThree() {
   }));
   scene.add(pointsMesh);
 
-  // 燈光（讓金屬材質有反射）
   const light1 = new THREE.PointLight(palette3D.color1, 2, 50);
   light1.position.set(5, 5, 5);
   scene.add(light1);
   const light2 = new THREE.PointLight(palette3D.color2, 2, 50);
   light2.position.set(-5, -5, 5);
   scene.add(light2);
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
-  scene.add(ambientLight);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.3));
 
-  // V22：極光
   const auroraGeo = new THREE.PlaneGeometry(60, 30, 1, 1);
   auroraMaterial = new THREE.ShaderMaterial({
     uniforms: {
@@ -2360,16 +2521,22 @@ function initThree() {
   auroraMesh.position.y = 5;
   scene.add(auroraMesh);
 
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
+  window.addEventListener('resize', handleResize);
+  window.addEventListener('orientationchange', () => setTimeout(handleResize, 300));
+
   window.addEventListener('mousemove', e => {
     threeMouseX = (e.clientX / window.innerWidth) * 2 - 1;
     threeMouseY = -(e.clientY / window.innerHeight) * 2 + 1;
   });
   initTouchControls(canvas);
+}
+
+function handleResize() {
+  if (!camera || !renderer) return;
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(PERF.dpr);
 }
 
 function initTouchControls(canvas) {
@@ -2379,10 +2546,7 @@ function initTouchControls(canvas) {
       const t1 = e.touches[0], t2 = e.touches[1];
       lastTouchDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
       lastTouchAngle = Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
-      lastTouchCenter = {
-        x: (t1.clientX + t2.clientX) / 2,
-        y: (t1.clientY + t2.clientY) / 2
-      };
+      lastTouchCenter = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
     }
   }, { passive: false });
 
@@ -2394,19 +2558,13 @@ function initTouchControls(canvas) {
       const angle = Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
       const centerX = (t1.clientX + t2.clientX) / 2;
       const centerY = (t1.clientY + t2.clientY) / 2;
-
       if (lastTouchDist > 0) {
-        const scale = dist / lastTouchDist;
-        touchZoom *= scale;
+        touchZoom *= dist / lastTouchDist;
         touchZoom = Math.max(0.5, Math.min(3, touchZoom));
       }
-
       touchRotateY += (angle - lastTouchAngle) * 0.5;
-      const dx = centerX - lastTouchCenter.x;
-      const dy = centerY - lastTouchCenter.y;
-      touchRotateX += dy * 0.005;
-      touchRotateY += dx * 0.005;
-
+      touchRotateX += (centerY - lastTouchCenter.y) * 0.005;
+      touchRotateY += (centerX - lastTouchCenter.x) * 0.005;
       lastTouchDist = dist;
       lastTouchAngle = angle;
       lastTouchCenter = { x: centerX, y: centerY };
@@ -2416,10 +2574,6 @@ function initTouchControls(canvas) {
   canvas.addEventListener('touchend', e => {
     if (e.touches.length < 2) lastTouchDist = 0;
   });
-
-  if ('ontouchstart' in window) {
-    setTimeout(() => document.getElementById('touch-hint').classList.add('visible'), 1500);
-  }
 }
 
 function updateThree() {
@@ -2439,14 +2593,11 @@ function updateThree() {
   pointsMesh.rotation.y = t * 0.02;
   pointsMesh.rotation.x = t * 0.01;
 
-  // 極光動畫
   if (auroraMaterial) {
     auroraMaterial.uniforms.uTime.value = t;
     auroraMaterial.uniforms.uIntensity.value = 0.5 + musicIntensity * 0.5;
   }
-  if (auroraMesh) {
-    auroraMesh.rotation.z = Math.sin(t * 0.1) * 0.1;
-  }
+  if (auroraMesh) auroraMesh.rotation.z = Math.sin(t * 0.1) * 0.1;
 
   const scale = (1 + musicIntensity * 0.2) * touchZoom;
   meshGroup.scale.set(scale, scale, scale);
@@ -2481,7 +2632,7 @@ function updateThreeTheme() {
 }
 
 /* ============================================================
-   9. p5.js 粒子層
+   9. p5 粒子
    ============================================================ */
 let particles = [], trail = [];
 const palette = [[120,180,255],[180,120,255],[255,255,255]];
@@ -2489,6 +2640,7 @@ let isDragging = false, dragStart = null;
 let textPoints = [];
 let titleEl = null;
 let titleParticlesActive = false;
+let p5Mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
 
 function setup() {
   const c = createCanvas(windowWidth, windowHeight);
@@ -2507,13 +2659,13 @@ function initTextParticles() {
   off.width = w; off.height = h;
   const ctx = off.getContext('2d');
   ctx.fillStyle = '#fff';
-  ctx.font = `200 ${Math.min(80, h * 0.8)}px "Courier New", monospace`;
+  ctx.font = `200 ${Math.min(80, h * 0.8)}px -apple-system, "Courier New", monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('展商城', w / 2, h / 2);
   const imgData = ctx.getImageData(0, 0, w, h).data;
   textPoints = [];
-  const step = 3;
+  const step = isMobile ? 4 : 3;
   for (let y = 0; y < h; y += step) {
     for (let x = 0; x < w; x += step) {
       const i = (y * w + x) * 4;
@@ -2535,10 +2687,10 @@ function draw() {
 
   if (titleParticlesActive && titleEl && titleEl.style.opacity !== '0') {
     textPoints.forEach(p => {
-      const d = dist(mouseX, mouseY, p.x, p.y);
+      const d = dist(p5Mouse.x, p5Mouse.y, p.x, p.y);
       if (d < 80) {
         const force = (80 - d) / 80 * 5;
-        const angle = atan2(p.y - mouseY, p.x - mouseX);
+        const angle = atan2(p.y - p5Mouse.y, p.x - p5Mouse.x);
         p.vx += cos(angle) * force;
         p.vy += sin(angle) * force;
       }
@@ -2554,28 +2706,28 @@ function draw() {
 
   if (isDragging && dragStart) {
     stroke(255, 255, 255, 30); strokeWeight(1); noFill();
-    circle(dragStart.x, dragStart.y, dist(dragStart.x, dragStart.y, mouseX, mouseY) * 2);
+    circle(dragStart.x, dragStart.y, dist(dragStart.x, dragStart.y, p5Mouse.x, p5Mouse.y) * 2);
     noStroke();
   }
 
-  trail.push({ x: mouseX, y: mouseY, life: 255 });
+  trail.push({ x: p5Mouse.x, y: p5Mouse.y, life: 255 });
   trail = trail.filter(p => p.life > 0);
   trail.forEach(p => {
     const c = palette[0];
     noStroke();
     fill(c[0], c[1], c[2], p.life * 0.12);
-    circle(p.x, p.y, 70);
+    circle(p.x, p.y, 60);
     p.life -= 10;
   });
 
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     if (isDragging && dragStart) {
-      const d = dist(p.x, p.y, mouseX, mouseY);
+      const d = dist(p.x, p.y, p5Mouse.x, p5Mouse.y);
       if (d < 250 && d > 0) {
         const force = (250 - d) / 250 * 0.6;
-        p.vx += (mouseX - p.x) / d * force;
-        p.vy += (mouseY - p.y) / d * force;
+        p.vx += (p5Mouse.x - p.x) / d * force;
+        p.vy += (p5Mouse.y - p.y) / d * force;
       }
     }
     p.x += p.vx; p.y += p.vy;
@@ -2590,7 +2742,7 @@ function draw() {
 
   if (frameCount % 2 === 0 && !isTransitioning) {
     particles.push({
-      x: mouseX + random(-5, 5), y: mouseY + random(-5, 5),
+      x: p5Mouse.x + random(-5, 5), y: p5Mouse.y + random(-5, 5),
       vx: random(-1, 1), vy: random(-1, 1),
       size: random(3, 8), life: 255,
       colorIdx: floor(random(palette.length))
@@ -2599,7 +2751,8 @@ function draw() {
 }
 
 function explode(x, y, count) {
-  for (let i = 0; i < count; i++) {
+  const n = isMobile ? Math.floor(count * 0.6) : count;
+  for (let i = 0; i < n; i++) {
     const angle = random(TWO_PI);
     const speed = random(2, 12);
     particles.push({
@@ -2611,37 +2764,53 @@ function explode(x, y, count) {
   }
 }
 
-function mousePressed() {
-  if (isTransitioning) return;
-  isDragging = true;
-  dragStart = { x: mouseX, y: mouseY };
-  explode(mouseX, mouseY, 60);
-  playSpatialSound(mouseX, mouseY, 440 + random(-100, 100), 0.6);
-}
-function mouseReleased() { isDragging = false; dragStart = null; }
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   if (titleParticlesActive) setTimeout(initTextParticles, 100);
   const gc = document.getElementById('gesture-canvas');
   gc.width = windowWidth;
   gc.height = windowHeight;
+  handleResize();
 }
-function touchStarted() { mousePressed(); return false; }
-function touchEnded() { mouseReleased(); return false; }
 
 function updateVisualizer() {
   if (!analyser) return;
   analyser.getByteFrequencyData(dataArray);
   for (let i = 0; i < vizBars.length; i++) {
     const v = dataArray[i] / 255;
-    vizBars[i].style.height = Math.max(2, v * 40) + 'px';
+    vizBars[i].style.height = Math.max(2, v * 30) + 'px';
   }
 }
 
+/* 用 pointer 事件更新 p5 滑鼠位置（桌機 + 手機通用） */
+document.addEventListener('mousemove', e => {
+  p5Mouse.x = e.clientX;
+  p5Mouse.y = e.clientY;
+});
+document.addEventListener('touchmove', e => {
+  if (e.touches.length > 0) {
+    p5Mouse.x = e.touches[0].clientX;
+    p5Mouse.y = e.touches[0].clientY;
+  }
+}, { passive: true });
+
+// 點擊 / 觸控 → 爆炸
+document.addEventListener('pointerdown', e => {
+  if (isTransitioning) return;
+  if (e.target.closest('.nav-card') || e.target.closest('button') ||
+      e.target.closest('#ai-panel') || e.target.closest('#record-panel') ||
+      e.target.closest('#mobile-controls')) return;
+  p5Mouse.x = e.clientX;
+  p5Mouse.y = e.clientY;
+  explode(e.clientX, e.clientY, isMobile ? 30 : 60);
+  playSpatialSound(e.clientX, e.clientY, 440 + random(-100, 100), 0.6);
+});
+
 /* ============================================================
-   10. 手勢控制
+   10. 陀螺儀
    ============================================================ */
 const gyroBtn = document.getElementById('gyro-toggle');
+const mGyro = document.getElementById('m-gyro');
 function enableGyro() {
   if (typeof DeviceOrientationEvent !== 'undefined' &&
       typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -2650,35 +2819,45 @@ function enableGyro() {
         window.addEventListener('deviceorientation', handleGyro);
         gyroEnabled = true;
         gyroBtn.classList.add('active');
+        mGyro.classList.add('active');
+        speak('手勢控制已啟用');
       }
     }).catch(console.error);
   } else {
     window.addEventListener('deviceorientation', handleGyro);
     gyroEnabled = true;
     gyroBtn.classList.add('active');
+    mGyro.classList.add('active');
+    speak('手勢控制已啟用');
   }
 }
 function handleGyro(e) {
   gyroX = Math.max(-1, Math.min(1, (e.gamma || 0) / 45));
   gyroY = Math.max(-1, Math.min(1, (e.beta || 0) / 45));
 }
-gyroBtn.addEventListener('click', () => {
+function toggleGyro() {
   if (gyroEnabled) {
     window.removeEventListener('deviceorientation', handleGyro);
     gyroEnabled = false;
     gyroBtn.classList.remove('active');
+    mGyro.classList.remove('active');
+    speak('手勢控制已關閉');
   } else enableGyro();
-});
+}
+gyroBtn.addEventListener('click', toggleGyro);
+mGyro.addEventListener('click', toggleGyro);
 
 /* ============================================================
-   11. 導航邏輯
+   11. 導航
    ============================================================ */
 const loader = document.getElementById('loader');
 const enterBtn = document.getElementById('enter-btn');
 const titleBar = document.getElementById('titleBar');
 const navGrid = document.getElementById('navGrid');
 const footerHint = document.getElementById('footerHint');
+const gestureHint = document.getElementById('gesture-hint');
 const soundToggle = document.getElementById('sound-toggle');
+const mSound = document.getElementById('m-sound');
 const overlay = document.getElementById('transition-overlay');
 const overlayTarget = document.getElementById('overlayTarget');
 const overlayUrl = document.getElementById('overlayUrl');
@@ -2697,6 +2876,7 @@ enterBtn.addEventListener('click', () => {
   setTimeout(() => {
     navGrid.classList.add('visible');
     footerHint.classList.add('visible');
+    if (isTouch) gestureHint.classList.add('visible');
     titleParticlesActive = false;
   }, 400);
 });
@@ -2704,22 +2884,40 @@ enterBtn.addEventListener('click', () => {
 document.querySelectorAll('.card-wrap').forEach(wrap => {
   let isFlipped = false;
   let flipTimer = null;
-  wrap.addEventListener('mouseenter', () => {
+
+  const flipIn = () => {
     if (isTransitioning) return;
     playHoverSound();
     playFlipSound();
     isFlipped = true;
-    wrap.classList.add('flipped');
+    wrap.classList.add('flipped', 'touched');
     if (flipTimer) clearTimeout(flipTimer);
-  });
-  wrap.addEventListener('mouseleave', () => {
+  };
+  const flipOut = () => {
     if (isTransitioning) return;
     if (flipTimer) clearTimeout(flipTimer);
     flipTimer = setTimeout(() => {
       isFlipped = false;
-      wrap.classList.remove('flipped');
+      wrap.classList.remove('flipped', 'touched');
     }, 500);
-  });
+  };
+
+  wrap.addEventListener('mouseenter', flipIn);
+  wrap.addEventListener('mouseleave', flipOut);
+
+  // 觸控：touchstart 翻轉，touchend 保持 0.8 秒後翻回
+  wrap.addEventListener('touchstart', e => {
+    if (isTransitioning) return;
+    flipIn();
+    if (flipTimer) clearTimeout(flipTimer);
+    flipTimer = setTimeout(() => {
+      if (!isTransitioning) {
+        isFlipped = false;
+        wrap.classList.remove('flipped', 'touched');
+      }
+    }, 1500);
+  }, { passive: true });
+
   wrap.addEventListener('mousemove', e => {
     const rect = wrap.getBoundingClientRect();
     const mx = ((e.clientX - rect.left) / rect.width) * 100;
@@ -2728,13 +2926,14 @@ document.querySelectorAll('.card-wrap').forEach(wrap => {
       c.style.setProperty('--mx', mx + '%');
       c.style.setProperty('--my', my + '%');
     });
-    if (!isFlipped) {
+    if (!isFlipped && !isTouch) {
       const rx = ((e.clientY - rect.top) / rect.height - 0.5) * 10;
       const ry = ((e.clientX - rect.left) / rect.width - 0.5) * -10;
       wrap.style.transform = `rotateY(${ry}deg) rotateX(${rx}deg)`;
     }
   });
   wrap.addEventListener('mouseleave', () => { wrap.style.transform = ''; });
+
   wrap.addEventListener('click', e => {
     e.preventDefault();
     if (isTransitioning) return;
@@ -2762,7 +2961,8 @@ function playTransitionSequence(wrap, href, title) {
 
   setTimeout(() => {
     playOpenSound();
-    window.open(href, '_blank', 'noopener,noreferrer');
+    try { window.open(href, '_blank', 'noopener,noreferrer'); }
+    catch (e) { window.location.href = href; }
   }, 1800);
 
   setTimeout(() => {
@@ -2773,38 +2973,236 @@ function playTransitionSequence(wrap, href, title) {
   }, 2800);
 }
 
-soundToggle.addEventListener('click', () => {
+function toggleSound() {
   if (!audioCtx) {
     initAudio();
-    soundToggle.textContent = '🔊';
+    updateSoundBtn();
   } else if (isAudioOn) {
     masterGain.gain.value = 0;
     isAudioOn = false;
-    soundToggle.textContent = '🔇';
+    updateSoundBtn();
   } else {
     masterGain.gain.value = volumeLevel;
     isAudioOn = true;
-    soundToggle.textContent = '🔊';
+    updateSoundBtn();
   }
-});
+}
+function updateSoundBtn() {
+  const icon = isAudioOn ? '🔊' : '🔇';
+  soundToggle.textContent = icon;
+  mSound.textContent = icon;
+}
+soundToggle.addEventListener('click', toggleSound);
+mSound.addEventListener('click', toggleSound);
 
 function updateIntensity() {
   musicIntensity += (targetIntensity - musicIntensity) * 0.05;
-  if (musicGain && isAudioOn) {
-    musicGain.gain.value = 0.35 + musicIntensity * 0.25;
-  }
-  if (wetGain && isAudioOn) {
-    wetGain.gain.value = 0.35 + musicIntensity * 0.3;
-  }
+  if (musicGain && isAudioOn) musicGain.gain.value = 0.35 + musicIntensity * 0.25;
+  if (wetGain && isAudioOn) wetGain.gain.value = 0.35 + musicIntensity * 0.3;
 }
 
 /* ============================================================
-   12. 啟動
+   12. 全螢幕
+   ============================================================ */
+const fullscreenBtn = document.getElementById('fullscreen-btn');
+fullscreenBtn.addEventListener('click', () => {
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    fullscreenBtn.textContent = '⛶';
+  } else {
+    if (document.exitFullscreen) document.exitFullscreen();
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+  }
+});
+
+/* ============================================================
+   13. PWA 安裝提示
+   ============================================================ */
+let deferredPrompt = null;
+const installHint = document.getElementById('install-hint');
+const installBtn = document.getElementById('install-btn');
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  setTimeout(() => installHint.classList.add('show'), 5000);
+});
+
+installBtn.addEventListener('click', async () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    installHint.classList.remove('show');
+  }
+});
+
+if (window.matchMedia('(display-mode: standalone)').matches) {
+  installHint.style.display = 'none';
+}
+
+/* ============================================================
+   14. 手勢彩蛋（觸控 + 滑鼠通用）
+   ============================================================ */
+const gestureCanvas = document.getElementById('gesture-canvas');
+const gestureCtx = gestureCanvas.getContext('2d');
+gestureCanvas.width = window.innerWidth;
+gestureCanvas.height = window.innerHeight;
+
+let gesturePath = [];
+let gestureStartTime = 0;
+let isDrawingGesture = false;
+let gesturePoints = 0;
+
+function handleGestureMove(x, y) {
+  if (isTransitioning) return;
+  const now = Date.now();
+  if (!isDrawingGesture) {
+    isDrawingGesture = true;
+    gesturePath = [];
+    gestureStartTime = now;
+  }
+  gesturePath.push({ x, y, t: now });
+  if (now - gestureStartTime > 1500) {
+    gesturePath = [{ x, y, t: now }];
+    gestureStartTime = now;
+  }
+  drawGestureTrail();
+}
+
+function drawGestureTrail() {
+  gestureCtx.clearRect(0, 0, gestureCanvas.width, gestureCanvas.height);
+  if (gesturePath.length < 2) return;
+  gestureCtx.beginPath();
+  gestureCtx.strokeStyle = 'rgba(138,180,255,0.5)';
+  gestureCtx.lineWidth = 2;
+  gestureCtx.lineCap = 'round';
+  gestureCtx.lineJoin = 'round';
+  gesturePath.forEach((p, i) => {
+    if (i === 0) gestureCtx.moveTo(p.x, p.y);
+    else gestureCtx.lineTo(p.x, p.y);
+  });
+  gestureCtx.stroke();
+  setTimeout(() => {
+    if (gesturePath.length < 2) return;
+    gestureCtx.clearRect(0, 0, gestureCanvas.width, gestureCanvas.height);
+  }, 600);
+}
+
+document.addEventListener('mousemove', e => handleGestureMove(e.clientX, e.clientY));
+document.addEventListener('touchmove', e => {
+  if (e.touches.length === 1) {
+    handleGestureMove(e.touches[0].clientX, e.touches[0].clientY);
+  }
+}, { passive: true });
+
+setInterval(() => {
+  if (gesturePath.length > 15 && Date.now() - gestureStartTime > 400) {
+    const gesture = detectGesture(gesturePath);
+    if (gesture) {
+      triggerGesture(gesture);
+      gesturePath = [];
+    }
+  }
+}, 200);
+
+function detectGesture(path) {
+  if (path.length < 15) return null;
+  let totalDist = 0;
+  let angleChanges = 0;
+  let prevAngle = null;
+  let dirs = { up: 0, down: 0, left: 0, right: 0 };
+  for (let i = 1; i < path.length; i++) {
+    const dx = path[i].x - path[i - 1].x;
+    const dy = path[i].y - path[i - 1].y;
+    const d = Math.hypot(dx, dy);
+    totalDist += d;
+    if (d > 3) {
+      const angle = Math.atan2(dy, dx);
+      if (prevAngle !== null) {
+        let diff = Math.abs(angle - prevAngle);
+        if (diff > Math.PI) diff = 2 * Math.PI - diff;
+        if (diff > 0.5) angleChanges++;
+      }
+      prevAngle = angle;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        if (dx > 0) dirs.right += d; else dirs.left += d;
+      } else {
+        if (dy > 0) dirs.down += d; else dirs.up += d;
+      }
+    }
+  }
+  if (angleChanges > 8 && totalDist > 200) return 'circle';
+  if (dirs.right > 50 && dirs.left > 50 && angleChanges > 3) return 'z';
+  if (dirs.down > 40 && dirs.up > 40 && angleChanges > 2) return 'v';
+  if (angleChanges > 5 && totalDist > 300 && angleChanges < 8) return 'triangle';
+  return null;
+}
+
+function triggerGesture(gesture) {
+  const eggs = {
+    circle: { icon: '◯', text: '圓滿', speak: '你畫了一個圓' },
+    z: { icon: '⚡', text: '閃電', speak: '你畫了一個閃電' },
+    v: { icon: '✓', text: '勝利', speak: '你畫了一個勝利' },
+    triangle: { icon: '▲', text: '神秘', speak: '你畫了一個三角形' }
+  };
+  const egg = eggs[gesture];
+  if (!egg) return;
+  const toast = document.getElementById('gesture-toast');
+  document.getElementById('toastIcon').textContent = egg.icon;
+  document.getElementById('toastText').textContent = egg.text;
+  toast.classList.add('show');
+  playRecSound();
+  speak(egg.speak);
+
+  if (gesture === 'circle') {
+    particles.forEach(p => {
+      const angle = atan2(p.y - height / 2, p.x - width / 2) + 0.3;
+      const d = dist(p.x, p.y, width / 2, height / 2);
+      p.x = width / 2 + cos(angle) * d;
+      p.y = height / 2 + sin(angle) * d;
+    });
+  } else if (gesture === 'z') {
+    for (let i = 0; i < 5; i++) {
+      setTimeout(() => explode(random(width), random(height), 30), i * 60);
+    }
+  } else if (gesture === 'v') {
+    particles.forEach(p => { p.vy = -3; });
+  } else if (gesture === 'triangle') {
+    palette.forEach(c => c.reverse());
+  }
+
+  setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+/* ============================================================
+   15. 防止縮放 / 下拉重整
+   ============================================================ */
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
+let lastTouchEnd = 0;
+document.addEventListener('touchend', e => {
+  const now = Date.now();
+  if (now - lastTouchEnd <= 300) e.preventDefault();
+  lastTouchEnd = now;
+}, { passive: false });
+
+/* ============================================================
+   16. 啟動
    ============================================================ */
 window.addEventListener('load', () => {
   initThree();
   animate();
   setTimeout(initTextParticles, 500);
+});
+
+// 首次觸控 / 點擊時喚醒 AudioContext
+['touchstart', 'click'].forEach(evt => {
+  document.addEventListener(evt, () => {
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  }, { once: false, passive: true });
 });
 
 function animate() {

@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#05050f">
 <meta name="mobile-web-app-capable" content="yes">
-<title>展商城 // 分頁總覽</title>
+<title>展商城 //  網頁總攬</title>
 <link rel="icon" type="image/png" href="logo.png">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -102,27 +102,71 @@
 
   .cursor {
     position: fixed;
-    width: 24px; height: 24px;
-    border: 1.5px solid var(--text);
+    width: 30px; height: 30px;
     border-radius: 50%;
     pointer-events: none;
     z-index: 9999;
     transform: translate(-50%, -50%);
-    transition: width 0.2s, height 0.2s, background 0.2s, border-color 0.6s;
-    mix-blend-mode: difference;
+    transition: width 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), height 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    will-change: left, top;
+  }
+  .cursor::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    padding: 1.5px;
+    background: conic-gradient(from var(--angle, 0deg), var(--accent), var(--accent2), transparent 45%, transparent 55%, var(--accent));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: liquidRotate 3s linear infinite;
+    opacity: 0.95;
+  }
+  .cursor::after {
+    content: '';
+    position: absolute;
+    inset: -7px;
+    border-radius: 50%;
+    box-shadow: 0 0 22px 1px rgba(138,180,255,0.35);
+    opacity: 0.7;
+    pointer-events: none;
   }
   .cursor-dot {
     position: fixed;
-    width: 5px; height: 5px;
-    background: var(--text);
+    width: 4px; height: 4px;
+    background: var(--accent);
     border-radius: 50%;
     pointer-events: none;
     z-index: 9999;
     transform: translate(-50%, -50%);
+    box-shadow: 0 0 8px var(--accent);
   }
   .cursor.active {
-    width: 60px; height: 60px;
-    background: rgba(255,255,255,0.15);
+    width: 22px; height: 22px;
+  }
+  .cursor.active::before {
+    animation-duration: 0.8s;
+  }
+  .cursor.hover {
+    width: 52px; height: 52px;
+  }
+  .cursor.hover::before {
+    animation-duration: 1.4s;
+  }
+  .cursor-ripple {
+    position: fixed;
+    width: 10px; height: 10px;
+    border: 1.5px solid var(--accent);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9998;
+    transform: translate(-50%, -50%);
+    opacity: 0.85;
+    animation: rippleExpand 0.6s ease-out forwards;
+  }
+  @keyframes rippleExpand {
+    to { width: 70px; height: 70px; opacity: 0; border-width: 0.5px; }
   }
 
   /* HUD - 手機上簡化 */
@@ -1282,6 +1326,199 @@
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
   }
+
+  /* 隱藏彩蛋按鈕 */
+  #secret-btn {
+    position: fixed;
+    bottom: calc(6px + var(--safe-bottom));
+    left: calc(6px + var(--safe-left));
+    width: 28px; height: 28px;
+    background: transparent;
+    border: none;
+    z-index: 50;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #secret-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.9);
+    z-index: 100001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s;
+    cursor: pointer;
+  }
+  #secret-overlay.show {
+    opacity: 1;
+    visibility: visible;
+  }
+  #secret-overlay .secret-text {
+    font-size: clamp(2.5rem, 12vw, 6rem);
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    background: linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet, red);
+    background-size: 400% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: secretRainbow 3s linear infinite;
+    text-align: center;
+  }
+  @keyframes secretRainbow {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 400% 50%; }
+  }
+
+  /* ============================================================
+     進入確認彈窗
+     ============================================================ */
+  #confirm-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 100002;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  #confirm-modal.show {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  #confirm-modal .confirm-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(var(--bg-rgb), 0.75);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+  }
+  #confirm-modal .confirm-card {
+    position: relative;
+    width: min(90vw, 340px);
+    padding: 32px 28px 26px;
+    border-radius: 22px;
+    text-align: center;
+    background: var(--card-bg);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border: 1px solid var(--card-border);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.15),
+      0 25px 70px rgba(0,0,0,0.45),
+      0 0 60px rgba(138,180,255,0.15);
+    transform: translateY(30px) scale(0.85) rotateX(12deg);
+    opacity: 0;
+    transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.35s ease;
+    perspective: 800px;
+  }
+  #confirm-modal.show .confirm-card {
+    transform: translateY(0) scale(1) rotateX(0deg);
+    opacity: 1;
+  }
+  #confirm-modal .confirm-card::after {
+    content: '';
+    position: absolute;
+    top: -2px; left: -2px;
+    right: -2px; bottom: -2px;
+    border-radius: 24px;
+    background: conic-gradient(
+      from var(--angle, 0deg),
+      transparent 0%,
+      var(--accent) 12%,
+      var(--accent2) 24%,
+      transparent 36%,
+      transparent 64%,
+      var(--accent) 76%,
+      #fff 88%,
+      transparent 100%
+    );
+    z-index: -1;
+    animation: liquidRotate 4s linear infinite;
+    opacity: 0.5;
+  }
+  #confirm-modal .confirm-icon {
+    font-size: 34px;
+    margin-bottom: 14px;
+    color: var(--accent);
+    text-shadow: 0 0 30px var(--accent);
+    animation: iconPulse 1.6s ease infinite;
+  }
+  #confirm-modal .confirm-label {
+    font-size: 9px;
+    letter-spacing: 4px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    opacity: 0.8;
+  }
+  #confirm-modal .confirm-title {
+    font-size: 1.35rem;
+    font-weight: 300;
+    letter-spacing: 0.1em;
+    color: var(--text);
+    margin-bottom: 10px;
+    background: linear-gradient(120deg, var(--text), var(--accent), var(--accent2), var(--text));
+    background-size: 300% 300%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: flow 6s ease infinite;
+  }
+  #confirm-modal .confirm-desc {
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    line-height: 1.7;
+    color: var(--text-dim);
+    margin-bottom: 24px;
+    word-break: break-all;
+  }
+  #confirm-modal .confirm-buttons {
+    display: flex;
+    gap: 10px;
+  }
+  #confirm-modal .confirm-btn {
+    flex: 1;
+    padding: 13px 10px;
+    border-radius: 100px;
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    cursor: pointer;
+    transition: all 0.3s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #confirm-modal .confirm-btn.cancel {
+    border: 1px solid var(--card-border);
+    background: transparent;
+    color: var(--text-dim);
+  }
+  #confirm-modal .confirm-btn.cancel:hover,
+  #confirm-modal .confirm-btn.cancel:active {
+    border-color: var(--text-dim);
+    color: var(--text);
+    background: rgba(255,255,255,0.05);
+  }
+  #confirm-modal .confirm-btn.ok {
+    border: 1px solid var(--accent);
+    background: linear-gradient(135deg, rgba(138,180,255,0.3), rgba(199,138,255,0.2));
+    color: var(--text);
+    font-weight: 600;
+    box-shadow: 0 0 20px rgba(138,180,255,0.25);
+  }
+  #confirm-modal .confirm-btn.ok:hover,
+  #confirm-modal .confirm-btn.ok:active {
+    transform: scale(0.97);
+    box-shadow: 0 0 30px rgba(138,180,255,0.5);
+  }
 </style>
 </head>
 <body>
@@ -1427,6 +1664,27 @@
 <div id="install-hint">
   📱 加到主畫面
   <button id="install-btn">安裝</button>
+</div>
+
+<!-- 隱藏彩蛋按鈕 -->
+<button id="secret-btn" aria-label=""></button>
+
+<div id="secret-overlay">
+  <div class="secret-text">你是甲</div>
+</div>
+
+<div id="confirm-modal">
+  <div class="confirm-backdrop"></div>
+  <div class="confirm-card">
+    <div class="confirm-icon">▸</div>
+    <div class="confirm-label">CONFIRM ENTRY</div>
+    <div class="confirm-title" id="confirmTitle">顧客開單</div>
+    <div class="confirm-desc" id="confirmDesc">即將開啟新分頁</div>
+    <div class="confirm-buttons">
+      <button class="confirm-btn cancel" id="confirmCancel">✕ 取消</button>
+      <button class="confirm-btn ok" id="confirmOk">確定進入 →</button>
+    </div>
+  </div>
 </div>
 
 <div id="transition-overlay">
@@ -1797,6 +2055,22 @@ function playSpatialSound(x, y, freq, duration = 0.5) {
   g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
   osc.connect(g); g.connect(panner); panner.connect(sfxGain);
   osc.start(); osc.stop(audioCtx.currentTime + duration);
+}
+
+function playCometIgnite() {
+  if (!isAudioOn) return;
+  const osc = audioCtx.createOscillator();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(80, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(700, audioCtx.currentTime + 0.5);
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass'; filter.frequency.value = 2000;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0, audioCtx.currentTime);
+  g.gain.linearRampToValueAtTime(0.12, audioCtx.currentTime + 0.08);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+  osc.connect(filter); filter.connect(g); g.connect(sfxGain);
+  osc.start(); osc.stop(audioCtx.currentTime + 0.6);
 }
 
 /* ============================================================
@@ -2324,11 +2598,13 @@ recClearBtn.addEventListener('click', () => {
    ============================================================ */
 const cursorEl = document.getElementById('cursor');
 const cursorDot = document.getElementById('cursorDot');
+let cursorX = window.innerWidth / 2, cursorY = window.innerHeight / 2;
+let cursorTargetX = cursorX, cursorTargetY = cursorY;
 
 function updateCursorAndHighlight(x, y) {
   if (!isTouch) {
-    cursorEl.style.left = x + 'px';
-    cursorEl.style.top = y + 'px';
+    cursorTargetX = x;
+    cursorTargetY = y;
     cursorDot.style.left = x + 'px';
     cursorDot.style.top = y + 'px';
   }
@@ -2345,6 +2621,26 @@ function updateCursorAndHighlight(x, y) {
   document.getElementById('hudCoords').textContent = `X:${xPad} Y:${yPad}`;
 }
 
+function animateCursorRing() {
+  cursorX += (cursorTargetX - cursorX) * 0.18;
+  cursorY += (cursorTargetY - cursorY) * 0.18;
+  if (!isTouch) {
+    cursorEl.style.left = cursorX + 'px';
+    cursorEl.style.top = cursorY + 'px';
+  }
+  requestAnimationFrame(animateCursorRing);
+}
+animateCursorRing();
+
+function spawnCursorRipple(x, y) {
+  const ripple = document.createElement('div');
+  ripple.className = 'cursor-ripple';
+  ripple.style.left = x + 'px';
+  ripple.style.top = y + 'px';
+  document.body.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 650);
+}
+
 document.addEventListener('mousemove', e => updateCursorAndHighlight(e.clientX, e.clientY));
 document.addEventListener('touchmove', e => {
   if (e.touches.length > 0) {
@@ -2352,8 +2648,16 @@ document.addEventListener('touchmove', e => {
   }
 }, { passive: true });
 
-document.addEventListener('mousedown', () => cursorEl.classList.add('active'));
+document.addEventListener('mousedown', e => {
+  cursorEl.classList.add('active');
+  if (!isTouch) spawnCursorRipple(e.clientX, e.clientY);
+});
 document.addEventListener('mouseup', () => cursorEl.classList.remove('active'));
+
+document.querySelectorAll('.card-wrap').forEach(w => {
+  w.addEventListener('mouseenter', () => cursorEl.classList.add('hover'));
+  w.addEventListener('mouseleave', () => cursorEl.classList.remove('hover'));
+});
 
 /* ============================================================
    8. Three.js
@@ -2363,7 +2667,8 @@ let auroraMesh, auroraMaterial;
 let clock, targetRotationX = 0, targetRotationY = 0;
 let currentRotationX = 0, currentRotationY = 0;
 let threeMouseX = 0, threeMouseY = 0;
-let cameraTargetZ = 8;
+let baseCameraZ = 8;
+let parallaxDepth = 0;
 let palette3D = { bg: 0x05050f, color1: 0x8ab4ff, color2: 0xc78aff };
 let gyroEnabled = false;
 let gyroX = 0, gyroY = 0;
@@ -2528,6 +2833,11 @@ function initThree() {
     threeMouseX = (e.clientX / window.innerWidth) * 2 - 1;
     threeMouseY = -(e.clientY / window.innerHeight) * 2 + 1;
   });
+  window.addEventListener('wheel', e => {
+    if (isTransitioning) return;
+    parallaxDepth += e.deltaY * 0.02;
+    parallaxDepth = Math.max(-25, Math.min(60, parallaxDepth));
+  }, { passive: true });
   initTouchControls(canvas);
 }
 
@@ -2565,6 +2875,8 @@ function initTouchControls(canvas) {
       touchRotateY += (angle - lastTouchAngle) * 0.5;
       touchRotateX += (centerY - lastTouchCenter.y) * 0.005;
       touchRotateY += (centerX - lastTouchCenter.x) * 0.005;
+      parallaxDepth += (lastTouchCenter.y - centerY) * 0.08;
+      parallaxDepth = Math.max(-25, Math.min(60, parallaxDepth));
       lastTouchDist = dist;
       lastTouchAngle = angle;
       lastTouchCenter = { x: centerX, y: centerY };
@@ -2606,7 +2918,13 @@ function updateThree() {
     pointsMesh.material.opacity = 0.8 + musicIntensity * 0.2;
   }
 
-  camera.position.z += (cameraTargetZ - camera.position.z) * 0.05;
+  /* 深空視差：主體、星點、極光用不同速度移動，製造穿越感 */
+  meshGroup.position.z = parallaxDepth * 0.12;
+  pointsMesh.position.z = -parallaxDepth * 0.7;
+  if (auroraMesh) auroraMesh.position.z = -15 - parallaxDepth * 1.4;
+  if (scene.fog) scene.fog.density = 0.02 + Math.min(Math.abs(parallaxDepth) * 0.0012, 0.03);
+
+  camera.position.z += ((baseCameraZ + parallaxDepth) - camera.position.z) * 0.06;
   renderer.render(scene, camera);
 }
 
@@ -2637,6 +2955,7 @@ function updateThreeTheme() {
 let particles = [], trail = [];
 const palette = [[120,180,255],[180,120,255],[255,255,255]];
 let isDragging = false, dragStart = null;
+let cometHoldStart = 0, cometActive = false, cometTrailPts = [];
 let textPoints = [];
 let titleEl = null;
 let titleParticlesActive = false;
@@ -2684,6 +3003,37 @@ function initTextParticles() {
 
 function draw() {
   clear();
+
+  /* 彗星尾巴：按住超過 1 秒點燃 */
+  if (cometHoldStart && !cometActive && !isTransitioning && Date.now() - cometHoldStart > 1000) {
+    cometActive = true;
+    playCometIgnite();
+  }
+  if (cometActive) {
+    cometTrailPts.push({ x: p5Mouse.x, y: p5Mouse.y });
+    if (cometTrailPts.length > 36) cometTrailPts.shift();
+    noFill();
+    for (let i = 1; i < cometTrailPts.length; i++) {
+      const p0 = cometTrailPts[i - 1], p1 = cometTrailPts[i];
+      const ratio = i / cometTrailPts.length;
+      stroke(255, 255, 255, ratio * 180);
+      strokeWeight(ratio * 12);
+      line(p0.x, p0.y, p1.x, p1.y);
+    }
+    noStroke();
+    fill(200, 220, 255, 240);
+    circle(p5Mouse.x, p5Mouse.y, 20);
+    fill(255, 255, 255, 255);
+    circle(p5Mouse.x, p5Mouse.y, 8);
+    if (frameCount % 2 === 0) {
+      particles.push({
+        x: p5Mouse.x + random(-6, 6), y: p5Mouse.y + random(-6, 6),
+        vx: random(-0.6, 0.6), vy: random(-0.6, 0.6),
+        size: random(4, 10), life: 255,
+        colorIdx: 2
+      });
+    }
+  }
 
   if (titleParticlesActive && titleEl && titleEl.style.opacity !== '0') {
     textPoints.forEach(p => {
@@ -2806,6 +3156,27 @@ document.addEventListener('pointerdown', e => {
   playSpatialSound(e.clientX, e.clientY, 440 + random(-100, 100), 0.6);
 });
 
+// 按住超過 1 秒 → 點燃彗星尾巴，放開 → 爆炸收尾
+document.addEventListener('pointerdown', e => {
+  if (isTransitioning) return;
+  if (e.target.closest('.nav-card') || e.target.closest('button') ||
+      e.target.closest('#ai-panel') || e.target.closest('#record-panel') ||
+      e.target.closest('#mobile-controls') || e.target.closest('#confirm-modal') ||
+      e.target.closest('#secret-overlay')) return;
+  cometHoldStart = Date.now();
+  cometActive = false;
+  cometTrailPts = [];
+});
+document.addEventListener('pointerup', () => {
+  if (cometActive) {
+    explode(p5Mouse.x, p5Mouse.y, isMobile ? 50 : 100);
+    playSpatialSound(p5Mouse.x, p5Mouse.y, 200, 1.0);
+  }
+  cometHoldStart = 0;
+  cometActive = false;
+  cometTrailPts = [];
+});
+
 /* ============================================================
    10. 陀螺儀
    ============================================================ */
@@ -2872,7 +3243,7 @@ enterBtn.addEventListener('click', () => {
   enterBtn.classList.add('hidden');
   titleBar.style.opacity = '0';
   titleBar.style.transform = 'translate(-50%, -80%) scale(0.9)';
-  cameraTargetZ = 12;
+  baseCameraZ = 12;
   setTimeout(() => {
     navGrid.classList.add('visible');
     footerHint.classList.add('visible');
@@ -2937,8 +3308,48 @@ document.querySelectorAll('.card-wrap').forEach(wrap => {
   wrap.addEventListener('click', e => {
     e.preventDefault();
     if (isTransitioning) return;
-    playTransitionSequence(wrap, wrap.dataset.href, wrap.dataset.title);
+    openConfirmModal(wrap, wrap.dataset.href, wrap.dataset.title);
   });
+});
+
+/* ============================================================
+   11b. 進入確認彈窗
+   ============================================================ */
+const confirmModal = document.getElementById('confirm-modal');
+const confirmTitleEl = document.getElementById('confirmTitle');
+const confirmDescEl = document.getElementById('confirmDesc');
+const confirmCancelBtn = document.getElementById('confirmCancel');
+const confirmOkBtn = document.getElementById('confirmOk');
+const confirmBackdrop = confirmModal.querySelector('.confirm-backdrop');
+let pendingNav = null;
+
+function openConfirmModal(wrap, href, title) {
+  pendingNav = { wrap, href, title };
+  confirmTitleEl.textContent = title;
+  confirmDescEl.textContent = `即將開啟新分頁：${href}`;
+  confirmModal.classList.add('show');
+  playHoverSound();
+}
+
+function closeConfirmModal() {
+  confirmModal.classList.remove('show');
+  pendingNav = null;
+}
+
+confirmCancelBtn.addEventListener('click', () => {
+  playFlipSound();
+  closeConfirmModal();
+});
+
+confirmBackdrop.addEventListener('click', () => {
+  closeConfirmModal();
+});
+
+confirmOkBtn.addEventListener('click', () => {
+  if (!pendingNav) return;
+  const { wrap, href, title } = pendingNav;
+  closeConfirmModal();
+  playTransitionSequence(wrap, href, title);
 });
 
 function playTransitionSequence(wrap, href, title) {
@@ -3190,7 +3601,23 @@ document.addEventListener('touchend', e => {
 }, { passive: false });
 
 /* ============================================================
-   16. 啟動
+   16. 隱藏彩蛋
+   ============================================================ */
+const secretBtn = document.getElementById('secret-btn');
+const secretOverlay = document.getElementById('secret-overlay');
+
+secretBtn.addEventListener('click', () => {
+  secretOverlay.classList.add('show');
+  playRecSound();
+  speak('你是甲');
+});
+
+secretOverlay.addEventListener('click', () => {
+  secretOverlay.classList.remove('show');
+});
+
+/* ============================================================
+   17. 啟動
    ============================================================ */
 window.addEventListener('load', () => {
   initThree();
